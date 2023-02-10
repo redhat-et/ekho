@@ -1,0 +1,155 @@
+@startuml
+
+skinparam noteBorderColor Black
+skinparam noteBorderThickness 1
+skinparam noteBackgroundColor Yellow
+skinparam legendBackgroundColor WhiteSmoke
+
+skinparam sequence {
+	BoxBorderColor Black
+	BoxFontSize 20
+
+	ArrowColor Black
+	ArrowThickness 1
+
+	ActorBorderColor Black
+	ActorBorderThickness 3
+	ActorBackgroundColor Business
+	ActorFontSize 15
+
+	ParticipantBorderColor Black
+	ParticipantBorderThickness 1
+	ParticipantBackgroundColor Business
+	ParticipantFontSize 15
+
+	LifeLineBorderColor Black
+	LifeLineBorderThickness 1
+	LifeLineBackgroundColor LightGray
+}
+
+
+ legend top right
+|= |= Legend |
+|<back:LightBlue>   </back>| Participants from this project - xPU Device Plugin and CNI |
+|<back:Dodgerblue>   </back>| Threads within Device Plugin |
+|<back:Business>   </back>| Participants external to this project |
+|<back:Turquoise>   </back>| Code waits, listening on socket |
+|<back:Yellow>   </back>| Notes |
+endlegend
+
+
+
+actor "User"
+box "Host Server"
+	participant "Linux"
+	participant "Kubelet"
+	participant "xPU Device Plugin" #dodgerblue
+	participant "CNI" #LightBlue
+	participant "Pod"
+end box
+participant "kube-apiserver"
+box "xPU Agent" #LightBlue
+participant "OPI xPU Agent"
+participant "OPI API"
+end box
+
+activate "OPI xPU Agent"
+"OPI xPU Agent" -> "kube-apiserver": Watch for OPI CRs
+== Initialization ==
+autonumber
+
+"User" -> "Kubelet": network attachment definition (CNI config)
+"User" -> "xPU Device Plugin": deploy
+activate "xPU Device Plugin"
+
+"xPU Device Plugin" -> "xPU Device Plugin": config.json
+"xPU Device Plugin" -> "Linux": create log file
+"xPU Device Plugin" -> "Linux" : Check host for requirements
+"xPU Device Plugin" -> "Linux": net.Interfaces()
+
+activate "xPU Device Plugin" #DarkGray
+note right #DarkGray: <color #White>discover resources</color>
+
+"Linux" --> "xPU Device Plugin": interface list
+
+"xPU Device Plugin" -> "Linux" : os.Readlink /sys/class/net/<interface>/device/driver
+"Linux" --> "xPU Device Plugin" : driver name
+
+activate "xPU Device Plugin" #SlateGray
+note right #SlateGray: <color #White>loop interfaces, build device list</color>
+
+deactivate "xPU Device Plugin"
+
+autonumber stop
+"xPU Device Plugin" [hidden]-> "xPU Device Plugin"
+autonumber resume
+
+deactivate "xPU Device Plugin"
+
+"xPU Device Plugin" -> "xPU Device Plugin": start GRPC
+"xPU Device Plugin" -> "Kubelet": GRPC: register
+"xPU Device Plugin" -> "Kubelet": GRPC: device list
+
+deactivate "xPU Device Plugin"
+
+== Pod Creation ==
+autonumber
+
+"User" -> "Kubelet": create pod
+"Kubelet" -> "xPU Device Plugin": GRPC: Allocate(subfunction)
+activate "xPU Device Plugin"
+
+"xPU Device Plugin" -> "kube-apiserver" : Create and push xPU Netdev CR
+"xPU Device Plugin" -> "kube-apiserver": Watch xPU Netdev CR
+"kube-apiserver" -> "OPI xPU Agent": Notify xPU Netdev CR
+"OPI xPU Agent" -> "OPI xPU Agent": Sync xPU Netdev CR
+"OPI xPU Agent"->"OPI API": Invoke OPI API to create the netdev
+"OPI API"-->"OPI xPU Agent": return success
+"OPI xPU Agent"->"kube-apiserver": Update status of xPU Netdev CR
+"kube-apiserver" -> "xPU Device Plugin": Notify xPU Netdev CR
+"xPU Device Plugin" -> "xPU Device Plugin": Sync xPU Netdev CR
+"xPU Device Plugin" --> "Kubelet": GRPC: AllocateResponse()
+deactivate "xPU Device Plugin"
+
+autonumber stop
+"Kubelet" -[#Red]>> "Pod" : <color:Red>Kubelet starts creating the pod around now
+autonumber resume
+
+"Kubelet" -> "CNI" : cmdAdd(VF/SF, namespace, config)
+activate "CNI"
+"CNI" -> "CNI" : cni.IPAM
+
+"CNI" -> "Pod" : place VF/SF in pod netns
+"CNI" -> "Kubelet" : return 0
+
+deactivate "CNI"
+
+autonumber stop
+
+== Pod Running ==
+
+"Kubelet" -> "Pod" : start pod
+"Pod" -> "Pod" : application start
+activate "Pod"
+
+
+== Pod Deletion ==
+autonumber
+
+"User" -> "Kubelet": delete pod
+"Kubelet" -> "Pod" : stop pod
+deactivate "Pod"
+"Kubelet" -> "CNI" : cmdDel(VF/SF, config)
+activate "CNI"
+"CNI" -> "Pod" : VF/SF from pod to host netns
+"Pod" --> "CNI" : VF/SF
+"CNI" -> "CNI" : clear IPAM
+"CNI" -> "kube-apiserver": delete OPI Netdev CR
+"kube-apiserver" -> "OPI xPU Agent": Notify delete xPU Netdev CR
+"OPI xPU Agent"->"OPI API": Invoke OPI API to delete the netdev
+"OPI API" --> "OPI xPU Agent": return success
+
+"Kubelet" -> "Pod" : delete pod
+deactivate "Pod"
+
+@enduml
