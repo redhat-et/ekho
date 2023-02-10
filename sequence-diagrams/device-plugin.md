@@ -18,7 +18,7 @@ DP interacts with the OPI to provision the appropriate VF and not the CNI.
 
 ### DP interacts with OPI xPU Agent via CRDs
 
-![alternative text](http://www.plantuml.com/plantuml/proxy?cache=no&src=https://raw.githubusercontent.com/redhat-et/opi-k8s-networking/main/sequence-diagrams/puml/device-plugin-CRs.puml?token=GHSAT0AAAAAAB5HTHR26VUGSPXYLNEKG3MEY7GJBPQ)
+![alternative text](http://www.plantuml.com/plantuml/proxy?cache=no&src=https://raw.githubusercontent.com/redhat-et/opi-k8s-networking/main/sequence-diagrams/puml/device-plugin-CRs.puml?token=GHSAT0AAAAAAB5HTHR3WESMKFJPOPC7YV5SY7GKS6Q)
 
 ### DP interacts with OPI Host Agent directly
 
