@@ -90,7 +90,7 @@ deactivate "xPU Device Plugin"
 autonumber
 
 "User" -> "Kubelet": create pod
-"Kubelet" -> "xPU Device Plugin": GRPC: Allocate(subfunction)
+"Kubelet" -> "xPU Device Plugin": GRPC: Allocate(VF/SF)
 activate "xPU Device Plugin"
 
 "xPU Device Plugin" -> "OPI Host Agent" : Plumb VF/SF by PCIe address to the xPU dataplane
