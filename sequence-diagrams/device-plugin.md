@@ -26,4 +26,4 @@ This is not really the K8s way of doing things.
 
 The following diagram shows the host view only, xPU view to be created separately or appended to this diagram.
 
-![alternative text](http://www.plantuml.com/plantuml/proxy?cache=no&src=https://raw.githubusercontent.com/redhat-et/opi-k8s-networking/main/sequence-diagrams/puml/device-plugin.puml?token=GHSAT0AAAAAAB5HTHR26VUGSPXYLNEKG3MEY7GJBPQ)
+![alternative text](http://www.plantuml.com/plantuml/proxy?cache=no&src=https://raw.githubusercontent.com/redhat-et/opi-k8s-networking/main/sequence-diagrams/puml/device-plugin.puml?token=GHSAT0AAAAAAB5HTHR2JBP22BUHARERXOOWY7GLBHQ)
