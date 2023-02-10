@@ -9,12 +9,12 @@ of VFs that can be requested by the Pod.
 
 DP interacts with the OPI to provision the appropriate VF and not the CNI.
 
-## Opens:
+## Opens
 
 - Is this even an option we want to consider? rather than just having a CNI.
 - Is the VF really the primary interface for the Pod? How would this work with something like prometheus today (if it's gathering app metrics). Won't another interface be needed?
 
-## Options
+## Provisioning a VF/SF to a Pod Options
 
 ### DP interacts with OPI xPU Agent via CRDs
 

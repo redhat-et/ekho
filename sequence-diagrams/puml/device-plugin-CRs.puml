@@ -145,6 +145,9 @@ activate "CNI"
 "Pod" --> "CNI" : VF/SF
 "CNI" -> "CNI" : clear IPAM
 "CNI" -> "kube-apiserver": delete OPI Netdev CR
+"CNI" --> "Kubelet": return 0
+deactivate "CNI"
+
 "kube-apiserver" -> "OPI xPU Agent": Notify delete xPU Netdev CR
 "OPI xPU Agent"->"OPI API": Invoke OPI API to delete the netdev
 "OPI API" --> "OPI xPU Agent": return success

@@ -40,62 +40,65 @@ endlegend
 
 
 actor "User"
-participant "Linux"
-participant "Kubelet"
-participant "OPI Host Agent"
-box "xPU Device Plugin" #LightBlue
-	participant "DP Main Thread" #dodgerblue
-end box
+box "Host Server"
+	participant "Linux"
+	participant "Kubelet"
+	participant "OPI Host Agent"
+	participant "xPU Device Plugin" #dodgerblue
 participant "CNI" #LightBlue
 participant "Pod"
+end box
 
 == Initialization ==
 autonumber
 
 "User" -> "Kubelet": network attachment definition (CNI config)
-"User" -> "DP Main Thread": deploy
-activate "DP Main Thread"
+"User" -> "xPU Device Plugin": deploy
+activate "xPU Device Plugin"
 
-"DP Main Thread" -> "DP Main Thread": config.json
-"DP Main Thread" -> "Linux": create log file
-"DP Main Thread" -> "Linux" : Check host for requirements
-"DP Main Thread" -> "Linux": net.Interfaces()
+"xPU Device Plugin" -> "xPU Device Plugin": config.json
+"xPU Device Plugin" -> "Linux": create log file
+"xPU Device Plugin" -> "Linux" : Check host for requirements
+"xPU Device Plugin" -> "Linux": net.Interfaces()
 
-activate "DP Main Thread" #DarkGray
+activate "xPU Device Plugin" #DarkGray
 note right #DarkGray: <color #White>discover resources</color>
 
-"Linux" --> "DP Main Thread": interface list
+"Linux" --> "xPU Device Plugin": interface list
 
-"DP Main Thread" -> "Linux" : os.Readlink /sys/class/net/<interface>/device/driver
-"Linux" --> "DP Main Thread" : driver name
+"xPU Device Plugin" -> "Linux" : os.Readlink /sys/class/net/<interface>/device/driver
+"Linux" --> "xPU Device Plugin" : driver name
 
-activate "DP Main Thread" #SlateGray
+activate "xPU Device Plugin" #SlateGray
 note right #SlateGray: <color #White>loop interfaces, build device list</color>
 
-deactivate "DP Main Thread"
+deactivate "xPU Device Plugin"
 
 autonumber stop
-"DP Main Thread" [hidden]-> "DP Main Thread"
+"xPU Device Plugin" [hidden]-> "xPU Device Plugin"
 autonumber resume
 
-deactivate "DP Main Thread"
+deactivate "xPU Device Plugin"
 
-"DP Main Thread" -> "DP Main Thread": start GRPC
-"DP Main Thread" -> "Kubelet": GRPC: register
-"DP Main Thread" -> "Kubelet": GRPC: device list
+"xPU Device Plugin" -> "xPU Device Plugin": start GRPC
+"xPU Device Plugin" -> "Kubelet": GRPC: register
+"xPU Device Plugin" -> "Kubelet": GRPC: device list
 
-deactivate "DP Main Thread"
+deactivate "xPU Device Plugin"
 
 == Pod Creation ==
 autonumber
 
 "User" -> "Kubelet": create pod
-"Kubelet" -> "DP Main Thread": GRPC: Allocate(subfunction)
-activate "DP Main Thread"
+"Kubelet" -> "xPU Device Plugin": GRPC: Allocate(subfunction)
+activate "xPU Device Plugin"
 
-"DP Main Thread" -> "OPI Host Agent" : Plumb VF/SF by PCIe address to the xPU dataplane
-"OPI Host Agent" --> "DP Main Thread" : return 0
-
+"xPU Device Plugin" -> "OPI Host Agent" : Plumb VF/SF by PCIe address to the xPU dataplane
+"OPI Host Agent"->"OPI API": Attach VF/SF by PCIe address to dataplane
+"OPI API"--> "OPI Host Agent": return 0
+"OPI Host Agent" --> "xPU Device Plugin" : return 0
+"xPU Device Plugin" --> "Kubelet": GRPC: AllocateResponse()
+deactivate "xPU Device Plugin"
 
 autonumber stop
 "Kubelet" -[#Red]>> "Pod" : <color:Red>Kubelet starts creating the pod around now
@@ -131,6 +134,11 @@ activate "CNI"
 "Pod" --> "CNI" : VF/SF
 "CNI" -> "CNI" : clear IPAM
 "CNI" -> "OPI Host Agent": remove VF/SF from xPU Dataplane
+"OPI Host Agent" -> "OPI API": remove VF/SF from xPU Dataplane
+"OPI API" -->  "OPI Host Agent": return 0
+"OPI Host Agent"--> "CNI": return 0
+"CNI" --> "Kubelet": return 0
+deactivate "CNI"
 
 "Kubelet" -> "Pod" : delete pod
 deactivate "Pod"
