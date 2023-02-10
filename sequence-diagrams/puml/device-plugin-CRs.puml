@@ -3,7 +3,6 @@
 skinparam noteBorderColor Black
 skinparam noteBorderThickness 1
 skinparam noteBackgroundColor Yellow
-skinparam legendBackgroundColor WhiteSmoke
 
 skinparam sequence {
 	BoxBorderColor Black
@@ -26,18 +25,6 @@ skinparam sequence {
 	LifeLineBorderThickness 1
 	LifeLineBackgroundColor LightGray
 }
-
-
- legend top right
-|= |= Legend |
-|<back:LightBlue>   </back>| Participants from this project - xPU Device Plugin and CNI |
-|<back:Dodgerblue>   </back>| Threads within Device Plugin |
-|<back:Business>   </back>| Participants external to this project |
-|<back:Turquoise>   </back>| Code waits, listening on socket |
-|<back:Yellow>   </back>| Notes |
-endlegend
-
-
 
 actor "User"
 box "Host Server"
