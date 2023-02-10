@@ -17,7 +17,7 @@ of VFs that can be requested by the Pod.
 
 ### DP interacts with OPI xPU Agent via CRDs
 
-![alternative text](http://www.plantuml.com/plantuml/proxy?cache=no&src=https://raw.githubusercontent.com/redhat-et/opi-k8s-networking/main/sequence-diagrams/puml/device-plugin-CRs.puml?token=GHSAT0AAAAAAB5HTHR3WESMKFJPOPC7YV5SY7GKS6Q)
+![device-plugin-cr](./images/device-plugin-cr.png)
 
 ### DP interacts with OPI Host Agent directly
 
@@ -25,4 +25,4 @@ This is not really the K8s way of doing things.
 
 The following diagram shows the host view only, xPU view to be created separately or appended to this diagram.
 
-![alternative text](http://www.plantuml.com/plantuml/proxy?cache=no&src=https://raw.githubusercontent.com/redhat-et/opi-k8s-networking/main/sequence-diagrams/puml/device-plugin.puml?token=GHSAT0AAAAAAB5HTHR2JBP22BUHARERXOOWY7GLBHQ)
+![device-plugin-cr](./images/device-plugin.png)
