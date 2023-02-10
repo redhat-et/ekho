@@ -6,13 +6,12 @@ of VFs that can be requested by the Pod.
 ## Assumptions
 
 - VFs/SFs are uniquely identified by their PCI address. AKA, PCI address is the same on the Host Server as on the xPU.
-
-DP interacts with the OPI to provision the appropriate VF and not the CNI.
+- DP interacts with the OPI to provision the appropriate VF and not the CNI.
 
 ## Opens
 
-- Is this even an option we want to consider? rather than just having a CNI.
-- Is the VF really the primary interface for the Pod? How would this work with something like prometheus today (if it's gathering app metrics). Won't another interface be needed?
+- Is this even an option we want to consider? rather than just having a CNI-SHIM manage it all.
+- Is the VF really the primary/only interface for the Pod? How would this work with something like prometheus today (if it's gathering app metrics). Won't another interface be needed? or is prometheus moving to the DPU?
 
 ## Provisioning a VF/SF to a Pod Options
 
