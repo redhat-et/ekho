@@ -1,0 +1,139 @@
+@startuml
+
+skinparam noteBorderColor Black
+skinparam noteBorderThickness 1
+skinparam noteBackgroundColor Yellow
+skinparam legendBackgroundColor WhiteSmoke
+
+skinparam sequence {
+	BoxBorderColor Black
+	BoxFontSize 20
+
+	ArrowColor Black
+	ArrowThickness 1
+
+	ActorBorderColor Black
+	ActorBorderThickness 3
+	ActorBackgroundColor Business
+	ActorFontSize 15
+
+	ParticipantBorderColor Black
+	ParticipantBorderThickness 1
+	ParticipantBackgroundColor Business
+	ParticipantFontSize 15
+
+	LifeLineBorderColor Black
+	LifeLineBorderThickness 1
+	LifeLineBackgroundColor LightGray
+}
+
+
+ legend top right
+|= |= Legend |
+|<back:LightBlue>   </back>| Participants from this project - xPU Device Plugin and CNI |
+|<back:Dodgerblue>   </back>| Threads within Device Plugin |
+|<back:Business>   </back>| Participants external to this project |
+|<back:Turquoise>   </back>| Code waits, listening on socket |
+|<back:Yellow>   </back>| Notes |
+endlegend
+
+
+
+actor "User"
+participant "Linux"
+participant "Kubelet"
+participant "OPI Host Agent"
+box "xPU Device Plugin" #LightBlue
+	participant "DP Main Thread" #dodgerblue
+end box
+participant "CNI" #LightBlue
+participant "Pod"
+
+== Initialization ==
+autonumber
+
+"User" -> "Kubelet": network attachment definition (CNI config)
+"User" -> "DP Main Thread": deploy
+activate "DP Main Thread"
+
+"DP Main Thread" -> "DP Main Thread": config.json
+"DP Main Thread" -> "Linux": create log file
+"DP Main Thread" -> "Linux" : Check host for requirements
+"DP Main Thread" -> "Linux": net.Interfaces()
+
+activate "DP Main Thread" #DarkGray
+note right #DarkGray: <color #White>discover resources</color>
+
+"Linux" --> "DP Main Thread": interface list
+
+"DP Main Thread" -> "Linux" : os.Readlink /sys/class/net/<interface>/device/driver
+"Linux" --> "DP Main Thread" : driver name
+
+activate "DP Main Thread" #SlateGray
+note right #SlateGray: <color #White>loop interfaces, build device list</color>
+
+deactivate "DP Main Thread"
+
+autonumber stop
+"DP Main Thread" [hidden]-> "DP Main Thread"
+autonumber resume
+
+deactivate "DP Main Thread"
+
+"DP Main Thread" -> "DP Main Thread": start GRPC
+"DP Main Thread" -> "Kubelet": GRPC: register
+"DP Main Thread" -> "Kubelet": GRPC: device list
+
+deactivate "DP Main Thread"
+
+== Pod Creation ==
+autonumber
+
+"User" -> "Kubelet": create pod
+"Kubelet" -> "DP Main Thread": GRPC: Allocate(subfunction)
+activate "DP Main Thread"
+
+"DP Main Thread" -> "OPI Host Agent" : Plumb VF/SF by PCIe address to the xPU dataplane
+"OPI Host Agent" --> "DP Main Thread" : return 0
+
+
+autonumber stop
+"Kubelet" -[#Red]>> "Pod" : <color:Red>Kubelet starts creating the pod around now
+autonumber resume
+
+"Kubelet" -> "CNI" : cmdAdd(VF/SF, namespace, config)
+activate "CNI"
+"CNI" -> "CNI" : cni.IPAM
+
+"CNI" -> "Pod" : place VF/SF in pod netns
+"CNI" -> "Kubelet" : return 0
+
+deactivate "CNI"
+
+autonumber stop
+
+== Pod Running ==
+
+"Kubelet" -> "Pod" : start pod
+"Pod" -> "Pod" : application start
+activate "Pod"
+
+
+== Pod Deletion ==
+autonumber
+
+"User" -> "Kubelet": delete pod
+"Kubelet" -> "Pod" : stop pod
+deactivate "Pod"
+"Kubelet" -> "CNI" : cmdDel(VF/SF, config)
+activate "CNI"
+"CNI" -> "Pod" : VF/SF from pod to host netns
+"Pod" --> "CNI" : VF/SF
+"CNI" -> "CNI" : clear IPAM
+"CNI" -> "OPI Host Agent": remove VF/SF from xPU Dataplane
+
+"Kubelet" -> "Pod" : delete pod
+deactivate "Pod"
+
+@enduml
+
