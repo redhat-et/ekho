@@ -86,7 +86,7 @@ autonumber
 "Kubelet" -> "xPU Device Plugin": GRPC: Allocate(VF/SF)
 activate "xPU Device Plugin"
 
-"xPU Device Plugin" -> "kube-apiserver" : Create and push xPU Netdev CR
+"xPU Device Plugin" -> "kube-apiserver" : Create and push xPU Netdev CRD
 "xPU Device Plugin" -> "kube-apiserver": Watch xPU Netdev CR
 "kube-apiserver" -> "OPI xPU Agent": Notify xPU Netdev CR
 "OPI xPU Agent" -> "OPI xPU Agent": Sync xPU Netdev CR
