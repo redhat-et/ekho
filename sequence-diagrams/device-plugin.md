@@ -5,7 +5,10 @@ of VFs/SFs that can be requested by the Pod.
 
 ## Assumptions
 
-- VFs/SFs are uniquely identified by their PCI address. AKA, PCI address is the same on the Host Server as on the xPU.
+- This is greenfield.
+
+- VFs/SFs are uniquely identified by their PCI address. AKA, PCI address is the same on the Host Server as on the xPU. This is needed to track VFs/SFs as they move through networking namespaces (if_index is not unique).
+
 - DP interacts with the OPI to provision the appropriate VF/SF and not the CNI. The CNI is a simple binary that runs to completion.
 
 ## Opens
@@ -24,13 +27,17 @@ of VFs/SFs that can be requested by the Pod.
 
 ### DP interacts with OPI xPU Agent via CRDs
 
+The following diagram shows the host view only, xPU view to be created separately or appended to this diagram.
+
+![device-plugin-cr](./images/device-plugin-cr.png)
+
 This would work for either a single cluster or multi-cluster scenario (that is
 a tenant and infra cluster). For the multi-cluster scenario, a broker could used
 to propagate CRDs across the clusters.
 
-> **_NOTE:_** The device plugin could be wrapped with an Operator.
+> **_NOTE 1:_** The device plugin could be wrapped with an Operator and an explicit controller.
 
-![device-plugin-cr](./images/device-plugin-cr.png)
+> **_NOTE 2:_** There should be a Device Plugin Service hook that runs after the CNI `cmdDel` call so that the CNI can remain as simple as possible and not need to use K8s client APIs.
 
 ### DP interacts with OPI Host Agent directly via gRPC
 
