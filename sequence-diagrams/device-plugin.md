@@ -11,6 +11,8 @@ of VFs/SFs that can be requested by the Pod.
 
 - DP interacts with the OPI to provision the appropriate VF/SF and not the CNI. The CNI is a simple binary that runs to completion.
 
+- The same scenario will work for Single Cluster or Multi-cluster.
+
 ## Opens
 
 - Is this even an option we want to consider? rather than just having a CNI-SHIM manage it all. CNI-SHIM means having a CNI control plane involved.
@@ -21,7 +23,9 @@ of VFs/SFs that can be requested by the Pod.
 
 - Is the VF/SF really the primary/only interface for the Pod? How would this work with something like prometheus today (if it's gathering app metrics). Won't another interface be needed? or is prometheus moving to the DPU?
 
-- Can the CNI even drive the CR deletion?
+- Can the CNI even drive the CR deletion? (probably if it has a Control Plane)
+
+- CNI IPAM (I presume the IP address will come from the xPU) - which will require a CNI control plane anyway. Therefore we need a CNI variation of this diagram...
 
 ## Provisioning a VF/SF to a Pod Options
 
