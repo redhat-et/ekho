@@ -11,6 +11,8 @@ of VFs/SFs that can be requested by the Pod.
 
 - DP interacts with the OPI to provision the appropriate VF/SF and not the CNI. The CNI is a simple binary that runs to completion.
 
+- The CNI will need to interact with the DPU via CRD to assign an IP address to the netdev when it runs? (Need to update the sequence diagram to reflect this).
+
 - The same scenario will work for Single Cluster or Multi-cluster.
 
 ## Opens
