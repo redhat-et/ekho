@@ -12,9 +12,11 @@ The main idea behind this document is to specify the flow of VF/SF allocation fr
 
 - This will work for primary or secondary networking.
 
+- Selectors will be used to decide worker nodes to apply the CRDs to.
+
 ## Opens
 
-- In the multi-cluster scenarion: is the VF/SF really the primary/only interface for the Pod? How would this work with something like prometheus today (if it's gathering app metrics).
+- In the multi-cluster scenarion: is the VF/SF really the primary/only interface for the Pod? How would this work with something like prometheus today (if it's gathering app metrics) or other services that gather logs.
 
 ### Provisioning via CRDs
 
