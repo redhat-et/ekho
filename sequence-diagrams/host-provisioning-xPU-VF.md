@@ -16,7 +16,9 @@ The main idea behind this document is to specify the flow of VF/SF allocation fr
 
 ## Opens
 
-- In the multi-cluster scenarion: is the VF/SF really the primary/only interface for the Pod? How would this work with something like prometheus today (if it's gathering app metrics) or other services that gather logs.
+- In the multi-cluster scenarion: is the VF/SF really the primary/only interface for the Pod?
+  - How would this work with something like prometheus today (if it's gathering app metrics) or other services that gather logs.
+
 
 ### Provisioning via CRDs
 
@@ -38,6 +40,8 @@ The main idea behind this document is to specify the flow of VF/SF allocation fr
    (vice versa).
 - **Broker**
   - Syncs OPI CRDs between the Tenant and Infra clusters.
+  - The Broker is a singleton component that is deployed on a cluster whose Kubernetes API must be accessible by all of the participating clusters.
+  - The Broker cluster may be one of the participating clusters or a standalone cluster without the other components deployed. The Agent components deployed in each participating cluster are configured with the information to securely connect to the Broker cluster’s API.
 
 The following high level diagram provides an overview of the entities working
 together to provision a primary network interface for a pod.
@@ -62,3 +66,16 @@ The following sequence diagram provides an overview of the entities working
 together to provision an interface for a pod in the Multi cluster scenario.
 
 ![host-provisioning-xPU-VF-multi-cluster](./images/host-provisioning-xPU-VF-multi-cluster.png)
+
+## CRDs
+
+## DPUNetworkNodeState
+
+```yaml
+TODO WIP
+```
+
+References
+
+- [1 Liveliness probes](https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/)
+- [2 Configuring dpu devices](https://docs.openshift.com/container-platform/4.12/networking/hardware_networks/configuring-dpu-device.html)
