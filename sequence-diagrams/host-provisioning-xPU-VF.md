@@ -14,11 +14,20 @@ The main idea behind this document is to specify the flow of VF/SF allocation fr
 
 - Selectors will be used to decide worker nodes to apply the CRDs to.
 
+- Service metrics will be collectable through services that are fully integrated
+as a Kubernetes deployment.
+
+- A third cluster will be used as the broker.
+
+- The Kublet will be host networked.
+
 ## Opens
 
-- In the multi-cluster scenarion: is the VF/SF really the primary/only interface for the Pod?
-  - How would this work with something like prometheus today (if it's gathering app metrics) or other services that gather logs.
-
+- Will this solution scale well across clusters in the two cluster scenario?
+- Does the CRD approach make sense in the single cluster scenario? ==> probably not.
+- If the infra cluster needs access to many Kubernetes resources in the tenant cluster, does it make sense to have a broker or is direct cluster access a better approach.
+- Should we even consider using something like microshift on the DPU in the two cluster scenario.
+- Need to think about how nodeport will work.
 
 ### Provisioning via CRDs
 
@@ -51,7 +60,20 @@ together to provision a primary network interface for a pod.
 The following high level diagram provides an overview of the entities working
 together to provision a secondary network interface for a pod.
 
-![secondary-int-provisioning-highlevel](./images/secondary-int-provisioning-highlevel.png)
+TODO
+
+#### Advantages
+
+The main advantage of this approach is that the scope of what is shared across clusters can be limited (in the two cluster scenario), while also allowing us to maintain a relatively simple CNI on the host side.
+
+#### Required CRDs
+
+TODO (WIP)
+
+- Netdev (New)
+- Service: reflecting the services in the tenant cluster.
+- EndpointSlice: reflecting the endpoint slices in the tenant cluster.
+- Network policy
 
 ### Single Cluster
 
