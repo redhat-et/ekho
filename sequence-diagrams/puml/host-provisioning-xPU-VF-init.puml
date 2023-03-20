@@ -1,0 +1,107 @@
+@startuml
+!pragma teoz true
+skinparam noteBorderColor Black
+skinparam noteBorderThickness 1
+skinparam noteBackgroundColor Yellow
+
+skinparam sequence {
+	BoxBorderColor Black
+	BoxFontSize 20
+
+	ArrowColor Black
+	ArrowThickness 1
+
+	ActorBorderColor Black
+	ActorBorderThickness 3
+	ActorBackgroundColor Business
+	ActorFontSize 15
+
+	ParticipantBorderColor Black
+	ParticipantBorderThickness 1
+	ParticipantBackgroundColor Business
+	ParticipantFontSize 15
+
+	LifeLineBorderColor Black
+	LifeLineBorderThickness 1
+	LifeLineBackgroundColor LightGray
+}
+
+actor "User"
+box "Host Server"
+	participant "Linux"
+	participant "Kubelet"
+  box "xPU Host Agent" #LightBlue
+         participant "OPI Host Controller"
+         participant "gRPC server"
+  end box
+	participant "xPU Device Plugin" #dodgerblue
+	participant "CNI" #LightBlue
+	participant "Pod"
+participant "kube-apiserver"
+end box
+
+
+== xPU Host Agent Initialization ==
+
+autonumber
+"User" -> "OPI Host Controller": deploy
+activate "OPI Host Controller"
+"OPI Host Controller" -> "OPI Host Controller": config.json
+"OPI Host Controller" -> "OPI Host Controller": start datasyncer
+"OPI Host Controller" -[#green]> "kube-apiserver": watch OPI CRDs
+"OPI Host Controller" -> "gRPC server": Start gRPC server
+activate "gRPC server"
+autonumber stop
+
+box "xPU"
+  box "xPU Agent" #LightBlue
+	participant "OPI xPU Controller"
+  end box
+  participant "OPI API"
+end box
+
+== xPU Agent Initialization ==
+
+autonumber
+"User" -> "OPI xPU Controller": deploy
+activate "OPI xPU Controller"
+"OPI xPU Controller" -> "OPI xPU Controller": config.json
+"OPI xPU Controller" -> "OPI xPU Controller": start datasyncer
+"OPI xPU Controller" -[#green]> "kube-apiserver"  : watch OPI CRDs, Kubernetes resources (Pods, Services, EndpointSlices, NetworkPolicy)
+autonumber stop
+
+
+== Device Plugin Initialization ==
+autonumber
+
+"User" -> "Kubelet": network attachment definition (CNI config)
+"User" -> "xPU Device Plugin": deploy
+activate "xPU Device Plugin"
+
+"xPU Device Plugin" -> "xPU Device Plugin": config.json
+
+"xPU Device Plugin" -> "Linux": net.Interfaces()
+
+activate "xPU Device Plugin" #DarkGray
+note right #DarkGray: <color #White>discover resources</color>
+
+"Linux" --> "xPU Device Plugin": interface list
+
+activate "xPU Device Plugin" #SlateGray
+note right #SlateGray: <color #White>loop interfaces, build device list</color>
+
+deactivate "xPU Device Plugin"
+
+autonumber stop
+"xPU Device Plugin" [hidden]-> "xPU Device Plugin"
+autonumber resume
+
+deactivate "xPU Device Plugin"
+
+"xPU Device Plugin" -> "xPU Device Plugin": start GRPC
+"xPU Device Plugin" -> "Kubelet": GRPC: register
+"xPU Device Plugin" -> "Kubelet": GRPC: device list
+
+deactivate "xPU Device Plugin"
+
+@enduml
