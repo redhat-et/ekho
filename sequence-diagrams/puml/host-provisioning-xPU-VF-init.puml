@@ -27,7 +27,7 @@ skinparam sequence {
 }
 
 actor "User"
-box "Host Server"
+box "Tenant Node - Host"
 	participant "Linux"
 	participant "Kubelet"
   box "xPU Host Agent" #LightBlue
@@ -37,23 +37,18 @@ box "Host Server"
 	participant "xPU Device Plugin" #dodgerblue
 	participant "CNI" #LightBlue
 	participant "Pod"
-participant "kube-apiserver"
 end box
 
+box "Tenant CP" #Orange
+  participant "kube-apiserver" as api1
+end box
 
-== xPU Host Agent Initialization ==
+box "Infra CP" #Orange
+  participant "kube-apiserver" as api2
+  participant "operator"
+end box
 
-autonumber
-"User" -> "OPI Host Controller": deploy
-activate "OPI Host Controller"
-"OPI Host Controller" -> "OPI Host Controller": config.json
-"OPI Host Controller" -> "OPI Host Controller": start datasyncer
-"OPI Host Controller" -[#green]> "kube-apiserver": watch OPI CRDs
-"OPI Host Controller" -> "gRPC server": Start gRPC server
-activate "gRPC server"
-autonumber stop
-
-box "xPU"
+box "Infra node - xPU"
   box "xPU Agent" #LightBlue
 	participant "OPI xPU Controller"
   end box
@@ -63,13 +58,31 @@ end box
 == xPU Agent Initialization ==
 
 autonumber
-"User" -> "OPI xPU Controller": deploy
+"User" -> "operator": deploy
+activate "operator"
+"operator" -> "operator": config.json
+"operator" -> "operator": start datasyncer
+"operator" -[#blue]> api1  : watch OPI CRDs, Kubernetes resources (Pods, Services, EndpointSlices, NetworkPolicy)
+"operator" -> "OPI xPU Controller": deploy
 activate "OPI xPU Controller"
-"OPI xPU Controller" -> "OPI xPU Controller": config.json
-"OPI xPU Controller" -> "OPI xPU Controller": start datasyncer
-"OPI xPU Controller" -[#green]> "kube-apiserver"  : watch OPI CRDs, Kubernetes resources (Pods, Services, EndpointSlices, NetworkPolicy)
+"OPI xPU Controller" -> "OPI xPU Controller": configure
+"OPI xPU Controller" -> "OPI API": initialize()
+"OPI API" --> "OPI xPU Controller": return
+"OPI xPU Controller" -> api2: watch OPI CRDs
+"OPI xPU Controller" --> "operator": return
 autonumber stop
 
+== xPU Host Agent Initialization ==
+
+autonumber
+"User" -> "OPI Host Controller": deploy
+activate "OPI Host Controller"
+"OPI Host Controller" -> "OPI Host Controller": config.json
+"OPI Host Controller" -> "OPI Host Controller": start datasyncer
+"OPI Host Controller" -[#blue]> api1: watch OPI CRDs
+"OPI Host Controller" -> "gRPC server": Start gRPC server
+activate "gRPC server"
+autonumber stop
 
 == Device Plugin Initialization ==
 autonumber
