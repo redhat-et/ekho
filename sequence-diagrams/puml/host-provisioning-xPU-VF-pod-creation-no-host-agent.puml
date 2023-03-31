@@ -1,0 +1,118 @@
+@startuml
+!pragma teoz true
+skinparam noteBorderColor Black
+skinparam noteBorderThickness 1
+skinparam noteBackgroundColor Yellow
+
+skinparam sequence {
+	BoxBorderColor Black
+	BoxFontSize 20
+
+	ArrowColor Black
+	ArrowThickness 1
+
+	ActorBorderColor Black
+	ActorBorderThickness 3
+	ActorBackgroundColor Business
+	ActorFontSize 15
+
+	ParticipantBorderColor Black
+	ParticipantBorderThickness 1
+	ParticipantBackgroundColor Business
+	ParticipantFontSize 15
+
+	LifeLineBorderColor Black
+	LifeLineBorderThickness 1
+	LifeLineBackgroundColor LightGray
+}
+
+actor "User"
+box "Tenant Node - Host"
+	participant "Linux"
+	participant "Kubelet"
+  box "xPU Device Plugin/SR-IOV Device Plugin" #dodgerblue
+         participant "Data Syncer"
+         participant "gRPC server"
+		 participant "Main Process"
+  end box
+	participant "CNI" #LightBlue
+	participant "Pod"
+end box
+
+box "Tenant CP" #Orange
+  participant "kube-apiserver" as api1
+end box
+
+box "Infra CP" #Orange
+  participant "kube-apiserver" as api2
+  participant "operator"
+end box
+
+box "Infra node - xPU"
+  box "xPU Agent" #LightBlue
+	participant "OPI xPU Controller"
+  end box
+  participant "OPI API"
+end box
+
+activate api1
+activate api2
+activate "Kubelet"
+activate "operator"
+activate "gRPC server"
+activate "OPI xPU Controller"
+activate "Data Syncer"
+
+== Pod Creation ==
+autonumber
+
+"User" -> "Kubelet": create pod
+"Kubelet" -> "Main Process": GRPC: Allocate(VF/SF)
+activate "Main Process"
+"Main Process" -> "gRPC server": GRPC: Allocate (VF/SF)
+"gRPC server" -> "Data Syncer" : Create xPU Netdev CRD
+"Data Syncer" -[#green]> api1 : Push xPU Netdev CRD
+api1 -[#green]> "operator": Notify xPU Netdev CRD
+"operator" -> "operator": Sync xPU Netdev CRD
+"operator" -> api2: push Netdev CR
+api2 -> "OPI xPU Controller": notify netdev CRD
+"OPI xPU Controller" -> "OPI xPU Controller": Sync xPU Netdev CRD
+"OPI xPU Controller"->"OPI API": Create the netdev
+"OPI API"-->"OPI xPU Controller": return success
+"OPI xPU Controller"->"OPI API": Get the IP for the netdev
+"OPI API"-->"OPI xPU Controller": return IP
+"OPI xPU Controller" -> api2: Update status + IP address of xPU Netdev CRD
+api2 -> "operator": Notify xPU Netdev CRD update
+"operator" -> "operator": Sync xPU Netdev CRD
+"operator"-[#green]>api1: Push updated Netdev CRD
+api1 -[#green]> "Data Syncer": Notify xPU Netdev CRD
+"Data Syncer" -> "Data Syncer": Sync xPU Netdev CRD
+"Data Syncer" -->"gRPC server": return success
+"gRPC server" -->"Main Process": return success
+"Main Process" --> "Kubelet": GRPC: AllocateResponse()
+deactivate "Main Process"
+
+autonumber stop
+"Kubelet" -[#Red]>> "Pod" : <color:Red>Kubelet starts creating the pod around now
+autonumber resume
+
+"Kubelet" -> "CNI" : cmdAdd(VF/SF, namespace, config)
+activate "CNI"
+"CNI" -> "gRPC server" : Get IP address from VF/SF CRD
+"gRPC server" -> "Data Syncer" : Get IP address from VF/SF CRD
+"Data Syncer" -->"gRPC server": return IP Address
+"gRPC server" --> "CNI" : return IP Address
+"CNI" -> "Pod" : place VF/SF in pod netns
+"CNI" -> "Kubelet" : return 0
+
+deactivate "CNI"
+
+autonumber stop
+
+== Pod Running ==
+
+"Kubelet" -> "Pod" : start pod
+"Pod" -> "Pod" : application start
+activate "Pod"
+
+@enduml

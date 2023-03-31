@@ -1,0 +1,109 @@
+@startuml
+!pragma teoz true
+skinparam noteBorderColor Black
+skinparam noteBorderThickness 1
+skinparam noteBackgroundColor Yellow
+
+skinparam sequence {
+	BoxBorderColor Black
+	BoxFontSize 20
+
+	ArrowColor Black
+	ArrowThickness 1
+
+	ActorBorderColor Black
+	ActorBorderThickness 3
+	ActorBackgroundColor Business
+	ActorFontSize 15
+
+	ParticipantBorderColor Black
+	ParticipantBorderThickness 1
+	ParticipantBackgroundColor Business
+	ParticipantFontSize 15
+
+	LifeLineBorderColor Black
+	LifeLineBorderThickness 1
+	LifeLineBackgroundColor LightGray
+}
+
+actor "User"
+box "Tenant Node - Host"
+	participant "Linux"
+	participant "Kubelet"
+  box "xPU Device Plugin/SR-IOV Device Plugin" #dodgerblue
+         participant "DataSyncer"
+         participant "gRPC server"
+        participant "Main Process"
+  end box
+	participant "CNI" #LightBlue
+	participant "Pod"
+end box
+
+box "Tenant CP" #Orange
+  participant "kube-apiserver" as api1
+end box
+
+box "Infra CP" #Orange
+  participant "kube-apiserver" as api2
+  participant "operator"
+end box
+
+box "Infra node - xPU"
+  box "xPU Agent" #LightBlue
+	participant "OPI xPU Controller"
+  end box
+  participant "OPI API"
+end box
+
+== xPU Agent Initialization ==
+
+autonumber
+"User" -> "operator": deploy
+activate "operator"
+"operator" -> "operator": config.json
+"operator" -> "operator": start datasyncer
+"operator" -[#blue]> api1  : watch OPI CRDs, Kubernetes resources (Pods, Services, EndpointSlices, NetworkPolicy)
+"operator" -> "OPI xPU Controller": deploy
+activate "OPI xPU Controller"
+"OPI xPU Controller" -> "OPI xPU Controller": configure
+"OPI xPU Controller" -> "OPI API": initialize()
+"OPI API" --> "OPI xPU Controller": return
+"OPI xPU Controller" -> api2: watch OPI CRDs
+"OPI xPU Controller" --> "operator": return
+autonumber stop
+
+== Device Plugin Initialization ==
+autonumber
+
+"User" -> "Kubelet": network attachment definition (CNI config)
+"User" -> "Main Process": deploy
+activate "Main Process"
+"Main Process" -> "Main Process": config.json
+"Main Process" -> "DataSyncer" : Start()
+activate "DataSyncer"
+"DataSyncer" -[#blue]> api1: watch OPI CRDs
+"DataSyncer" --> "Main Process": return
+"Main Process" -> "gRPC server" : Start()
+activate "gRPC server"
+"gRPC server" --> "Main Process": return
+"Main Process" -> "Linux": net.Interfaces()
+activate "Main Process" #DarkGray
+note right #DarkGray: <color #White>discover resources</color>
+"Linux" --> "Main Process": interface list
+activate "Main Process" #SlateGray
+note right #SlateGray: <color #White>loop interfaces, build device list</color>
+deactivate "Main Process"
+
+autonumber stop
+"Main Process" [hidden]-> "Main Process"
+autonumber resume
+
+deactivate "Main Process"
+
+"Main Process" -> "Main Process": start DP GRPC
+"Main Process" -> "Kubelet": GRPC: register
+"Main Process" -> "Kubelet": GRPC: device list
+
+deactivate "Main Process"
+
+@enduml
