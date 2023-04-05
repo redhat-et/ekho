@@ -1,36 +1,34 @@
 # Host provisioning xPU VF/SF
 
-The main idea behind this document is to specify the flow of VF/SF allocation from the Host POV if the networking infrastructure is provided by a xPU.
+The main idea behind this document is to specify the flow of VF/SF allocation from the Host POV if the networking infrastructure is provided by a xPU. The main focus of the document will be the two cluster scenario, whereby the x86 host is part of a tenant cluster and the DPU is part of an infrastructure cluster.
 
 ## Assumptions
 
 - VFs/SFs are uniquely identified using `SerialNum/PF_id/VF_id`. This is needed to track VFs/SFs as they move through networking namespaces (if_index is not unique).
 
-- The same scenario will work for both Single Cluster or Multi-cluster.
+- While this document focuses on the two cluster scenario, the same solution will work for both Single Cluster or Multi-cluster.
 
 - This will work for primary or secondary networking.
 
 - Selectors will be used to decide worker nodes to apply the CRDs to.
 
-- Service metrics will be collectable through services that are fully integrated
-as a Kubernetes deployment.
+- Service metrics will be collectable through services that are fully integrated as a Kubernetes deployment.
 
 - The Kublet will be host networked.
 
-- The infrastructure is the `primary` entity driving/making networking decisions on behalf of the host.
+- The infrastructure (aka the DPU) is the `primary` entity driving/making networking decisions on behalf of the host.
 
 ## Opens
 
-- If the infra cluster needs access to many Kubernetes resources in the tenant cluster, does it make sense to have a broker or is direct cluster access a better approach and does a broker architecture scale well across clusters when many of the resources that need to be shared are Kubernetes resources.
 - Should we even consider using something like microshift on the DPU in the two cluster scenario.
-- Need to think about how nodeport will work.
-- How to use CNI in hetrogenous deployments.
+- How will nodeport will work?
+- How to use CNI in hetrogenous deployments. Is CNI delegation something that we need?
 
 ### To Broker or not to Broker?
 
-A **Broker** is an entity that syncs OPI CRDs between the Tenant and Infra clusters. It's a singleton component that is deployed on a cluster whose Kubernetes API must be accessible by all of the participating clusters. The Broker cluster may be one of the participating clusters or a standalone cluster without the other components deployed. The Agent components deployed in each participating cluster are configured with the information to securely connect to the Broker cluster’s API.
+A **Broker** is an entity that could be used to sync OPI CRDs and tenant resources between the Tenant and Infra clusters. It's a singleton component that is deployed on a cluster whose Kubernetes API must be accessible by all of the participating clusters. The Broker cluster may be one of the participating clusters or a standalone cluster without the other components deployed. The Agent components deployed in each participating cluster are configured with the information to securely connect to the Broker cluster’s API.
 
-The xPU Kubernetes architecture will avoid leveraging a Broker within the xPU as the infra cluster and the tenant cluster are tightly coupled. The infra cluster will need a access to several Kubernetes resources and it does not make sense to replicate these (resources) through CRDs via a Broker. There's also a question of latency introduced by the Broker and whether or not it can scale.
+The proposal is to avoid leveraging a Broker within the xPU Kubernetes architecture as the infra cluster and the tenant cluster are tightly coupled. The infra cluster will need a access to several Kubernetes resources and it does not make sense to replicate these (resources) through CRDs via a Broker. There's also a question of latency introduced by the Broker and whether or not it can scale.
 
 ### Provisioning Entities and roles
 
@@ -53,16 +51,13 @@ The xPU Kubernetes architecture will avoid leveraging a Broker within the xPU as
 
 ### Required Resources
 
-TODO (WIP)
+A non exhaustive list of resources that need to be shared from the tenant cluster to the infra cluster include:
 
 - Netdev CRD (New)
+- Pods
 - Service: reflecting the services in the tenant cluster.
 - EndpointSlice: reflecting the endpoint slices in the tenant cluster.
 - Network policy: reflecting the network policies in the tenant cluster.
-
-### Single Cluster sequence diagrams
-
-TODO
 
 ### Multi Cluster sequence diagrams
 
@@ -87,10 +82,32 @@ TODO
 
 ## CRDs
 
-### DPUNetworkNodeState
+### Netdev
 
-```yaml
-TODO WIP
+```golang
+type NetdevStatus string
+
+const (
+    Connected NetdevStatus = "connected"
+    Connecting NetdevStatus = "connecting"
+    Disconnected NetdevStatus = "disconnected"
+    ConnectionError NetdevStatus = "error"
+)
+
+type NetdevSpec struct {
+    NetdevID string `json:"netdev_id"` // SerialNum_PFID_SFID
+    Hostname string `json:"hostname"`
+    Subnets []string `json:"subnets"` // or maybe other routing info?
+    IP string `json:"ip"`
+    Backend string `json:"backend,omitempty"` //subfunction or virtual function
+    Status NetdevStatus `json:"status"`
+}
+
+type Netdev struct {
+    metav1.TypeMeta `json:",inline"`
+    metav1.ObjectMeta `json:"metadata,omitempty"`
+    Spec NetdevSpec `json:"spec"`
+}
 ```
 
 References
