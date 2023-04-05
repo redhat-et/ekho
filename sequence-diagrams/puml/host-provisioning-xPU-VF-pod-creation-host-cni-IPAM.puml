@@ -1,0 +1,133 @@
+@startuml
+!pragma teoz true
+skinparam noteBorderColor Black
+skinparam noteBorderThickness 1
+skinparam noteBackgroundColor Yellow
+
+skinparam sequence {
+	BoxBorderColor Black
+	BoxFontSize 20
+
+	ArrowColor Black
+	ArrowThickness 1
+
+	ActorBorderColor Black
+	ActorBorderThickness 3
+	ActorBackgroundColor Business
+	ActorFontSize 15
+
+	ParticipantBorderColor Black
+	ParticipantBorderThickness 1
+	ParticipantBackgroundColor Business
+	ParticipantFontSize 15
+
+	LifeLineBorderColor Black
+	LifeLineBorderThickness 1
+	LifeLineBackgroundColor LightGray
+}
+
+actor "User"
+box "Tenant Node - Host"
+	participant "Linux"
+	participant "Kubelet"
+  box "xPU Host Agent" #LightBlue
+         participant "OPI Host Controller"
+         participant "gRPC server"
+  end box
+	participant "xPU Device Plugin" #dodgerblue
+	participant "CNI" #LightBlue
+	participant "Pod"
+end box
+
+box "Tenant CP" #Orange
+  participant "kube-apiserver" as api1
+end box
+
+box "Infra CP" #Orange
+  participant "kube-apiserver" as api2
+  participant "operator"
+end box
+
+box "Infra node - xPU"
+  box "xPU Agent" #LightBlue
+	participant "OPI xPU Controller"
+  end box
+  participant "OPI API"
+end box
+
+activate api1
+activate api2
+activate "Kubelet"
+activate "operator"
+activate "gRPC server"
+activate "OPI xPU Controller"
+activate "OPI Host Controller"
+
+== Pod Creation ==
+autonumber
+
+"User" -> "Kubelet": create pod
+"Kubelet" -> "xPU Device Plugin": GRPC: Allocate(VF/SF)
+activate "xPU Device Plugin"
+"xPU Device Plugin" -> "gRPC server": GRPC: Allocate (VF/SF)
+"gRPC server" -> "OPI Host Controller" : Create xPU Netdev CRD
+"OPI Host Controller" -[#green]> api1 : Push xPU Netdev CRD
+api1 -[#green]> "operator": Notify xPU Netdev CRD
+"operator" -> "operator": Sync xPU Netdev CRD
+"operator" -> api2: push Netdev CR
+api2 -> "OPI xPU Controller": notify netdev CRD
+"OPI xPU Controller" -> "OPI xPU Controller": Sync xPU Netdev CRD
+"OPI xPU Controller"->"OPI API": Create the netdev
+"OPI API"-->"OPI xPU Controller": return success
+"OPI xPU Controller"->"OPI API": Get the IP for the netdev
+"OPI API"-->"OPI xPU Controller": return IP
+"OPI xPU Controller" -> api2: Update status xPU Netdev CRD
+api2 -> "operator": Notify xPU Netdev CRD update
+"operator" -> "operator": Sync xPU Netdev CRD
+"operator"-[#green]>api1: Push updated Netdev CRD
+api1 -[#green]> "OPI Host Controller": Notify xPU Netdev CRD
+"OPI Host Controller" -> "OPI Host Controller": Sync xPU Netdev CRD
+"OPI Host Controller" -->"gRPC server": return success
+"gRPC server" -->"xPU Device Plugin": return success
+"xPU Device Plugin" --> "Kubelet": GRPC: AllocateResponse()
+deactivate "xPU Device Plugin"
+
+autonumber stop
+"Kubelet" -[#Red]>> "Pod" : <color:Red>Kubelet starts creating the pod around now
+autonumber resume
+
+"Kubelet" -> "CNI" : cmdAdd(VF/SF, namespace, config)
+activate "CNI"
+"CNI" -> "CNI" : cni.IPAM()
+"CNI" -> "gRPC server" : Update netdev CRD with IP address
+"gRPC server" -> "OPI Host Controller" : Update netdev CRD with IP address
+"OPI Host Controller" -[#green]> api1 : Push Netdev CRD
+api1 -[#green]> "operator": Notify Netdev CRD
+"operator" -> "operator": Sync Netdev CRD
+"operator" -> api2: push Netdev CR
+api2 -> "OPI xPU Controller": notify netdev CRD
+"OPI xPU Controller" -> "OPI xPU Controller": Sync Netdev CRD
+"OPI xPU Controller"->"OPI API": Allocate the netdev IP address
+"OPI API"-->"OPI xPU Controller": return success
+"OPI xPU Controller" -> api2: Update Status xPU Netdev CRD
+api2 -> "operator": Notify xPU Netdev CRD update
+"operator" -> "operator": Sync xPU Netdev CRD
+"operator"-[#green]>api1: Push updated Netdev CRD
+api1 -[#green]> "OPI Host Controller": Notify xPU Netdev CRD
+"OPI Host Controller" -> "OPI Host Controller": Sync xPU Netdev CRD
+"OPI Host Controller" -->"gRPC server": return success
+"gRPC server" --> "CNI" : return success
+"CNI" -> "Pod" : place VF/SF in pod netns
+"CNI" -> "Kubelet" : return 0
+
+deactivate "CNI"
+
+autonumber stop
+
+== Pod Running ==
+
+"Kubelet" -> "Pod" : start pod
+"Pod" -> "Pod" : application start
+activate "Pod"
+
+@enduml
