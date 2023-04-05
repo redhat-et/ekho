@@ -67,18 +67,25 @@ The following high level diagram provides an overview of the initialization of t
 
 ![host-provisioning-initialization](./images/host-provisioning-xPU-VF-init.png)
 
-The following high level diagram provides an overview of the entities working
-together to provision a secondary network interface for a pod.
+An alternative option would be to eliminate the host agent, and the sequence diagram for that looks as follows:
 
-TODO
+![host-provisioning-initialization-no-host-agent](./images/host-provisioning-xPU-VF-init-no-host-agent.png)
 
 #### Pod Creation
 
 ![host-provisioning-pod-creation](./images/host-provisioning-xPU-VF-pod-creation.png)
 
+An alternative option would be to eliminate the host agent, and the sequence diagram for that looks as follows:
+
+![host-provisioning-pod-creation-no-host-agent](./images/host-provisioning-xPU-VF-pod-creation-no-host-agent.png)
+
 #### Pod Deletion
 
 ![host-provisioning-pod-deletion](./images/host-provisioning-xPU-VF-pod-deletion.png)
+
+An alternative option would be to eliminate the host agent, and the sequence diagram for that looks as follows:
+
+![host-provisioning-pod-deletion-no-host-agent](./images/host-provisioning-xPU-VF-pod-deletion-no-host-agent.png)
 
 ## CRDs
 
