@@ -39,6 +39,8 @@ box "Tenant Node - Host"
 	participant "Pod"
 end box
 
+note over "xPU Device Plugin": Could be the SR-IOV DP
+
 box "Tenant CP" #Orange
   participant "kube-apiserver" as api1
 end box
