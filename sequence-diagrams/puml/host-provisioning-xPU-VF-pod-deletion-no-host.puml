@@ -1,0 +1,92 @@
+@startuml
+!pragma teoz true
+skinparam noteBorderColor Black
+skinparam noteBorderThickness 1
+skinparam noteBackgroundColor Yellow
+
+skinparam sequence {
+	BoxBorderColor Black
+	BoxFontSize 20
+
+	ArrowColor Black
+	ArrowThickness 1
+
+	ActorBorderColor Black
+	ActorBorderThickness 3
+	ActorBackgroundColor Business
+	ActorFontSize 15
+
+	ParticipantBorderColor Black
+	ParticipantBorderThickness 1
+	ParticipantBackgroundColor Business
+	ParticipantFontSize 15
+
+	LifeLineBorderColor Black
+	LifeLineBorderThickness 1
+	LifeLineBackgroundColor LightGray
+}
+
+actor "User"
+box "Tenant Node - Host"
+	participant "Linux"
+	participant "Kubelet"
+  box "xPU Device Plugin/SR-IOV Device Plugin" #dodgerblue
+         participant "Data Syncer"
+         participant "gRPC server"
+		 participant "Main Process"
+  end box
+	participant "CNI" #LightBlue
+	participant "Pod"
+end box
+
+box "Tenant CP" #Orange
+  participant "kube-apiserver" as api1
+end box
+
+box "Infra CP" #Orange
+  participant "kube-apiserver" as api2
+  participant "operator"
+end box
+
+box "Infra node - xPU"
+  box "xPU Agent" #LightBlue
+	participant "OPI xPU Controller"
+  end box
+  participant "OPI API"
+end box
+
+activate api1
+activate api2
+activate "Kubelet"
+activate "operator"
+activate "gRPC server"
+activate "OPI xPU Controller"
+activate "Data Syncer"
+
+== Pod Deletion ==
+autonumber
+
+"User" -> "Kubelet": delete pod
+"Kubelet" -> "Pod" : stop pod
+deactivate "Pod"
+"Kubelet" -> "CNI" : cmdDel(VF/SF, config)
+activate "CNI"
+"CNI" -> "Pod" : VF/SF from pod to host netns
+"Pod" --> "CNI" : VF/SF
+"CNI" -> "CNI" : clear IPAM
+"CNI" -> "gRPC server": clear IPAM
+"gRPC server" -> "Data Syncer": delete Netdev
+"Data Syncer" -[#green]> api1: delete OPI Netdev CR
+api1 -[#green]> "operator": Notify delete xPU Netdev CR
+"operator" -> api2: delete xPU Netdev CR
+api2 -> "OPI xPU Controller": Notify delete xPU Netdev CR
+"OPI xPU Controller"->"OPI API": Delete the VF/SF
+"OPI API" --> "OPI xPU Controller": return success
+"gRPC server" --> "CNI": return success
+"CNI" --> "Kubelet": return 0
+deactivate "CNI"
+
+"Kubelet" -> "Pod" : delete pod
+deactivate "Pod"
+
+@enduml

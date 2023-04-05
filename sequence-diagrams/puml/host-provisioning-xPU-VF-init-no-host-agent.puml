@@ -62,13 +62,13 @@ autonumber
 activate "operator"
 "operator" -> "operator": config.json
 "operator" -> "operator": start datasyncer
-"operator" -[#blue]> api1  : watch OPI CRDs, Kubernetes resources (Pods, Services, EndpointSlices, NetworkPolicy)
+"operator" -[#blue]> api1  : watch OPI CRDs, Tenant resources (Pods, Services, EndpointSlices, NetworkPolicy)
 "operator" -> "OPI xPU Controller": deploy
 activate "OPI xPU Controller"
 "OPI xPU Controller" -> "OPI xPU Controller": configure
 "OPI xPU Controller" -> "OPI API": initialize()
 "OPI API" --> "OPI xPU Controller": return
-"OPI xPU Controller" -> api2: watch OPI CRDs
+"OPI xPU Controller" -> api2: watch OPI CRDs, Tenant resources (Pods, Services, EndpointSlices, NetworkPolicy)
 "OPI xPU Controller" --> "operator": return
 autonumber stop
 
@@ -81,7 +81,7 @@ activate "Main Process"
 "Main Process" -> "Main Process": config.json
 "Main Process" -> "DataSyncer" : Start()
 activate "DataSyncer"
-"DataSyncer" -[#blue]> api1: watch OPI CRDs
+"DataSyncer" -[#blue]> api1: watch Netdev CRDs
 "DataSyncer" --> "Main Process": return
 "Main Process" -> "gRPC server" : Start()
 activate "gRPC server"
