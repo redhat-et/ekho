@@ -1,0 +1,3 @@
+clang
+-Ibpf-notifier/install/include
+-Ibpf-notifier/.output
