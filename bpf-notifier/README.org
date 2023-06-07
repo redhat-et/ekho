@@ -1,0 +1,23 @@
+* bpf-notifier
+
+PoC to explore using a BPF program attached to ~fentry/call_switchdev_notifiers~ to capture
+switchdev notifier messages and forward the info to user space via a BPF ring buffer.
+
+Run the notifier:
+
+#+begin_src sh :results output
+$ sudo ./notifier
+#+end_src
+
+In a separate terminal, create a bridge:
+
+#+begin_src sh :results output
+$ sudo ip link add name br0 type bridge
+#+end_src
+
+You should see a notifier event in the first terminal:
+
+#+begin_src sh :results output
+$ sudo ./notifier
+notifier event id=3, mac=3a:d:d0:de:f:a8, name=br0
+#+end_src

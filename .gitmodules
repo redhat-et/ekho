@@ -1,0 +1,3 @@
+[submodule "bpf-notifier/libbpf"]
+	path = bpf-notifier/libbpf
+	url = git@github.com:libbpf/libbpf.git
