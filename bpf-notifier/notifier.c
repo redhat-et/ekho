@@ -81,10 +81,30 @@ static void sig_handler(int sig)
 static int process_event(void *ctx, void *data, size_t len)
 {
 	struct notifier_event *event = data;
+	char prefix[40];
 
-        printf("notifier event id=%lu, mac=%s, name=%s\n", event->val,
-               ether_ntoa((struct ether_addr*)event->mac), event->name);
-        return 0;
+	switch (event->type) {
+	case N_SWITCHDEV:
+		printf("switchdev event id=%lu, mac=%s, name=%s\n",
+		       event->val,
+		       ether_ntoa((struct ether_addr*)event->mac),
+		       event->name);
+		break;
+	case N_FIB:
+		switch (event->family) {
+		case AF_INET:
+			inet_ntop(AF_INET, &event->ipv4_dest, prefix, 40);
+			break;
+		case AF_INET6:
+			inet_ntop(AF_INET6, &event->ipv6_dest, prefix, 40);
+			break;
+		}
+		printf("fib event id=%lu, dest=%s/%d\n",
+		       event->val,
+		       prefix, event->dest_len);
+		break;
+	}
+	return 0;
 }
 
 int main(int argc, char **argv)
@@ -128,7 +148,7 @@ int main(int argc, char **argv)
 
 	struct ring_buffer* ringbuf =
 		ring_buffer__new(bpf_map__fd(skel->maps.notifier_events), process_event, NULL, NULL);
-        while (!exiting) {
+	while (!exiting) {
 		ring_buffer__poll(ringbuf, 100);
 	}
 
