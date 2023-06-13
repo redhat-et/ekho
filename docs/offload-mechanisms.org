@@ -1,0 +1,297 @@
+* Exploring different offload mechanisms
+
+** Netlink mirroring
+
+All Linux user space applications use netlink messages, either directly or indirectly, to
+program the kernel networking stack. Netlink provides fine-grained control over all aspects of
+kernel networking and represents the scope of features required by OPI.
+
+Netlink is the configuration interface of the kernel networking stack. All user space
+applications use AF_NETLINK socket message to configure the kernel networking state and to
+receive notifications of changes made by other applications.
+
+#+begin_src dot :file "images/netlink.png" :exports results
+ digraph netlink {
+        fontname="Arial"
+        node [fontname="Arial"]
+        edge [fontname="Arial"]
+
+        subgraph user_space {
+                app [shape=box label="app ..."]
+                listener [shape=box label="listener ..."]
+                rank = same;
+        }
+        subgraph cluster_kernel {
+                label = "kernel"
+                labeljust = "l"
+                rtnl [shape=box label="route / link / addr"]
+                netfilter [shape=box]
+                ovs [shape=box]
+                rank = same;
+        }
+
+        app -> rtnl [label="netlink"]
+        app -> netfilter
+        app -> ovs
+        listener -> rtnl [dir=back]
+        listener -> netfilter [dir=back]
+        listener -> ovs [label="netlink\nnotify"; dir=back]
+ }
+#+end_src
+
+#+RESULTS:
+[[file:images/netlink.png]]
+
+** Classic hardware offload
+
+In the classical hardware offload approach, the driver must implement all offloads via the
+~ndo_setup_tc~ hook in ~struct net_device_ops~, defined in [[https://elixir.bootlin.com/linux/latest/source/include/linux/netdevice.h#L1493][include/linux/netdevice.h]].
+
+#+begin_src dot :file "images/classic_offload.png" :exports results
+ digraph classic_offload {
+        fontname="Arial"
+        node [fontname="Arial"]
+        edge [fontname="Arial"]
+
+        app [shape=box]
+        subgraph cluster_kernel {
+                label = "kernel";
+                tc [shape=box]
+                driver [shape=box]
+        }
+
+        app -> tc [label="netlink"]
+        tc -> driver [label="ops->ndo_setup_tc(...)"]
+        driver -> nic
+ }
+#+end_src
+
+#+RESULTS:
+[[file:images/classic_offload.png]]
+
+** Mirroring kernel networking state
+
+DPU hardware could offload more than the existing capabilities that are supported by the
+~ndo_setup_tc~ hook. For example routing tables could be mirrored to the DPU to allow for
+hardware-accelerated route based forwarding. This could be done by using a netlink listener
+consuming netlink notifications and using an out-of-band mechanism to program the equivalent
+state on the DPU hardware.
+
+#+begin_src dot :file "images/mirror_state.png" :exports results
+ digraph mirror_state {
+        fontname="Arial"
+        node [fontname="Arial"]
+        edge [fontname="Arial"]
+
+        subgraph user_space {
+                app [shape=box]
+                listener [shape=box]
+                rank = same;
+        }
+        subgraph cluster_kernel {
+                label = "kernel"
+                labeljust = "l"
+                tc [shape=box; label="tc / rtnl"]
+                driver [shape=box]
+        }
+
+        app -> tc [label="netlink"]
+        listener -> tc [label="netlink\nnotify"; dir=back]
+        tc -> driver [label="ops->ndo_setup_tc(...)"]
+        driver -> nic
+
+        listener -> nic [label="out of band\nprogramming" style=dashed]
+
+        edge[style=invis]
+        listener->tc->driver->nic
+ }
+#+end_src
+
+#+RESULTS:
+[[file:images/mirror_state.png]]
+
+** Extending offloads with BPF
+
+It might be possible to use BPF ~struct_ops~ to provide a way to extend offload capabilities
+without driver development work.
+
+#+begin_src dot :file "images/bpf_enablement.png" :exports results
+ digraph mirror_state {
+        fontname="Arial"
+        node [fontname="Arial"]
+        edge [fontname="Arial"]
+
+        subgraph user_space {
+                app [shape=box]
+                listener [shape=box label="User space helper\nw/ vendor libraries"]
+                rank = same;
+        }
+        subgraph cluster_kernel {
+                label = "kernel"
+                labeljust = "l"
+                tc [shape=box; label="tc / rtnl"]
+                ringbuf
+                {rank = same; tc; ringbuf}
+                driver [shape=box]
+                bpf [shape=box label="BPF prog"]
+                maps [shape=note]
+                {rank = same; driver; bpf; maps;}
+        }
+
+        app -> tc [label="netlink"]
+        listener -> ringbuf -> bpf [dir=back]
+        tc -> driver [label="ops->ndo_setup_tc(...)"]
+        driver -> nic
+        driver -> bpf
+        bpf -> maps
+
+        listener -> nic [label="out of band\nprogramming" style=dashed]
+        listener -> maps [style=dashed; dir=back]
+
+        edge[style=invis]
+        app->listener
+ }
+#+end_src
+
+#+RESULTS:
+[[file:images/bpf_enablement.png]]
+
+** Switchdev offloads with BPF
+
+This diagram shows roughly what Anton has prototyped for switchdev notifier offloads.
+
+Each of the switchdev notifier types could be handled by:
+1. A driver dispatching them to a registered BPF program
+2. The BPF program sending them on a ringbuf to userspace
+
+#+begin_src C
+enum switchdev_notifier_type {
+	SWITCHDEV_FDB_ADD_TO_BRIDGE = 1,
+	SWITCHDEV_FDB_DEL_TO_BRIDGE,
+	SWITCHDEV_FDB_ADD_TO_DEVICE,
+	SWITCHDEV_FDB_DEL_TO_DEVICE,
+	SWITCHDEV_FDB_OFFLOADED,
+	SWITCHDEV_FDB_FLUSH_TO_BRIDGE,
+
+	SWITCHDEV_PORT_OBJ_ADD, /* Blocking. */
+	SWITCHDEV_PORT_OBJ_DEL, /* Blocking. */
+	SWITCHDEV_PORT_ATTR_SET, /* May be blocking . */
+
+	SWITCHDEV_VXLAN_FDB_ADD_TO_BRIDGE,
+	SWITCHDEV_VXLAN_FDB_DEL_TO_BRIDGE,
+	SWITCHDEV_VXLAN_FDB_ADD_TO_DEVICE,
+	SWITCHDEV_VXLAN_FDB_DEL_TO_DEVICE,
+	SWITCHDEV_VXLAN_FDB_OFFLOADED,
+
+	SWITCHDEV_BRPORT_OFFLOADED,
+	SWITCHDEV_BRPORT_UNOFFLOADED,
+};
+#+end_src
+
+
+#+begin_src dot :file "images/switchdev_offload.png" :exports results
+ digraph switchdev {
+        fontname="Arial"
+        nodesep=0.75
+        node [fontname="Arial"]
+        edge [fontname="Arial"]
+
+        subgraph user_space {
+                app [shape=box]
+                listener [shape=box label="User space helper\nw/ vendor libraries"]
+                rank = same;
+        }
+        subgraph cluster_kernel {
+                label = "kernel"
+                labeljust = "l"
+                bridge [shape=box; label="bridge"]
+                ringbuf
+                {rank = same; bridge; ringbuf}
+                driver [shape=box label="driver(s)\nw/ struct_ops BPF progs"]
+                bpf [shape=box label="BPF prog"]
+                maps [shape=note]
+                {rank = same; driver; bpf; maps;}
+        }
+
+        app -> bridge [label="netlink"]
+        listener -> ringbuf -> bpf [dir=back]
+        bridge -> driver [dir=back label="MAC/VLAN learning\ncall_switchdev_notifiers\n(*_TO_BRIDGE)"]
+        bridge -> driver [label="call_switchdev_notifiers\n(*_TO_DEVICE)"]
+        driver -> nic [label="traditional\nprogramming path"]
+        driver -> bpf
+        bpf -> maps
+
+        listener -> nic [label="out of band\nprogramming" style=dashed]
+        listener -> maps [style=dashed; dir=back]
+ }
+#+end_src
+
+#+RESULTS:
+[[file:images/switchdev_offload.png]]
+
+** FIB offloads
+
+The same mechanism used for switchdev FDB offloads could also be used for routing FIB offloads.
+
+#+begin_src C
+enum fib_event_type {
+	FIB_EVENT_ENTRY_REPLACE,
+	FIB_EVENT_ENTRY_APPEND,
+	FIB_EVENT_ENTRY_ADD,
+	FIB_EVENT_ENTRY_DEL,
+	FIB_EVENT_RULE_ADD,
+	FIB_EVENT_RULE_DEL,
+	FIB_EVENT_NH_ADD,
+	FIB_EVENT_NH_DEL,
+	FIB_EVENT_VIF_ADD,
+	FIB_EVENT_VIF_DEL,
+};
+#+end_src
+
+** Stats collection with BPF
+
+It is necessary to be able to collect statistics for offloaded flows. This is required by e.g.
+ovs to ensure active flows do not get deleted. A driver typically provides stats on demand via
+the flow offload infrastructure which uses the `FLOW_CLS_STATS` command to request the driver to
+provide the latest hardware stats.
+
+BPF could provide the “glue” code between stats requests and out-of-band stats collection. A
+user space application routinely collects stats from the hardware and writes the latest stats
+into BPF maps. When stats are requested, a BPF program can be used to populate a preallocated
+stats struct from the data present in the BPF maps.
+
+#+begin_src dot :file "images/stats_offload.png" :exports results
+ digraph stats_offload {
+        fontname="Arial"
+        nodesep=0.75
+        node [fontname="Arial"]
+        edge [fontname="Arial"]
+
+        subgraph user_space {
+                app [shape=box]
+                listener [shape=box label="User space helper\nw/ vendor libraries"]
+                rank = same;
+        }
+        subgraph cluster_kernel {
+                label = "kernel"
+                labeljust = "l"
+                rtnl [shape=box; label="rtnl / ovs"]
+                driver [shape=box label="driver(s)\nw/ struct_ops BPF progs"]
+                bpf [shape=box label="BPF prog"]
+                maps [shape=note]
+                {rank = same; driver; bpf; maps;}
+        }
+
+        app -> rtnl [label="netlink dump (stats)"]
+        rtnl -> driver [label="flow_offload\n(FLOW_CLS_STATS)"]
+        driver -> nic [label="traditional\nstats path"; dir=back; style=dashed]
+        driver -> bpf
+        bpf -> maps [label="read stats" style=dashed]
+
+        listener -> nic [label="out of band\nstats collection" dir=back]
+        listener -> maps [label="write stats"]
+ }
+#+end_src
+
+#+RESULTS:
+[[file:images/stats_offload.png]]
