@@ -8,12 +8,12 @@
 #include <bpf/bpf_core_read.h>
 #include <linux/netdevice.h>
 
-#include "netdev_hw.h"
 #include "offload.h"
 
 char LICENSE[] SEC("license") = "Dual BSD/GPL";
 
 struct net_device {
+	char name[IFNAMSIZ];
 } __attribute__((preserve_access_index));
 
 struct flow_stats {
@@ -27,16 +27,24 @@ struct flow_cls_offload {
 	struct flow_stats stats;
 } __attribute__((preserve_access_index));
 
+struct net_device_hw_ops {
+	void (*offload)(struct net_device *dev,
+			struct flow_cls_offload *off);
+	char name[16];
+};
 
 SEC("struct_ops/offload")
 void BPF_PROG(offload,
 	      struct net_device *dev,
 	      struct flow_cls_offload *off)
 {
-	// bpf_printk("struct_ops/offload called\n");
+	bpf_printk("struct_ops/offload %s\n", dev->name);
+	off->stats.pkts = 1;
+	off->stats.bytes = 1;
+	off->stats.lastused = bpf_ktime_get_ns();
 }
 
-SEC(".struct_ops")
+SEC(".struct_ops.link")
 struct net_device_hw_ops hwops = {
 	.offload = (void *)offload,
 	.name = "netdev_hwops",
