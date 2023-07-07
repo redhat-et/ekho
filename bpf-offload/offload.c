@@ -99,6 +99,12 @@ int main(int argc, char **argv)
 		return 1;
 	}
 
+	err = bpf_map__set_map_flags(skel->maps.hwops, BPF_F_LINK);
+	if (err) {
+		fprintf(stderr, "Failed to set map flags\n");
+		goto cleanup;
+	}
+
 	/* Load & verify BPF programs */
 	err = offload_bpf__load(skel);
 	if (err) {
@@ -106,8 +112,12 @@ int main(int argc, char **argv)
 		goto cleanup;
 	}
 
-	bpf_map__set_map_flags(skel->maps.hwops, BPF_F_LINK);
-	bpf_map__set_ifindex(skel->maps.hwops, 1);
+	err = bpf_map__set_ifindex(skel->maps.hwops, 1);
+	if (err) {
+		fprintf(stderr, "Failed to set ifindex\n");
+		goto cleanup;
+	}
+
 	link = bpf_map__attach_struct_ops(skel->maps.hwops);
 	if (!link) {
 		perror("Failed to attach struct_ops");
