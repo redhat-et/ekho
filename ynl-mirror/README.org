@@ -1,0 +1,7 @@
+* ynl-mirror
+
+A PoC to listen to netlink notifications and use them to mirror state to an
+"offload" data path. This PoC uses the [[https://github.com/redhat-et/ekho-qemu][ekho-qemu lab]] as a mock test environment.
+
+~server.py~ registers for rtnlgrp-ipv4-route notifications and converts them
+into equivalent routes to configure on the "dpu" data path.
