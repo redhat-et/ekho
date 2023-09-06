@@ -1,4 +1,4 @@
-LINUX ?= ../linux
+LINUX ?= ../../linux
 
 ynl:	## Copy kernel YNL files to here
 	@echo "Checking for linux tree in $(LINUX)" && [ -d "$(LINUX)" ]
