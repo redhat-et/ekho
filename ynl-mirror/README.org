@@ -3,5 +3,50 @@
 A PoC to listen to netlink notifications and use them to mirror state to an
 "offload" data path. This PoC uses the [[https://github.com/redhat-et/ekho-qemu][ekho-qemu lab]] as a mock test environment.
 
-~server.py~ registers for rtnlgrp-ipv4-route notifications and converts them
+** Prototype with L3 routing
+
+~l3-server.py~ registers for rtnlgrp-ipv4-route notifications and converts them
 into equivalent routes to configure on the "dpu" data path.
+
+~l3-hw-agent.py~ provides a netlink agent gateway on the "dpu".
+
+*** Route Mapping
+
+The L3 routed testbed is a contrived scenario that is configured with 2 VRFs on the dpu. Route
+offloads need to be mapped to the correct VRF and egress interface.
+
++ ~192.168.11/24 nexthop 192.168.101.1~ maps to ~192.168.11/24 vrf b nexthop dev eth3~
++ ~192.168.12/24 nexthop 192.168.102.1~ maps to ~192.168.12/24 vrf a nexthop dev eth4~
+
+This means it is necessary to identify the source VRF and the exit interface by inference from
+existing routes.
+
+A crude approach is to choose from routes for connected subnets:
+
++ Choose an existing route with same prefix
++ Use same outbound interface ~rta-oif~
++ Find the set of vrf tables minus the vrf ~rtm-table~ of the route
++ Program a route in each of these tables
+
+*** Example
+
+Normal kernel routes, deployed with ~make kernel~ when the PoC is not running:
+
+#+begin_src sh :results output
+[donaldh@ekho-host-a ~]$ traceroute 192.168.12.2
+traceroute to 192.168.12.2 (192.168.12.2), 30 hops max, 60 byte packets
+ 1  192.168.11.1 (192.168.11.1)  0.483 ms  0.453 ms  0.442 ms
+ 2  192.168.101.2 (192.168.101.2)  1.037 ms  1.026 ms  1.015 ms
+ 3  192.168.102.1 (192.168.102.1)  1.329 ms  1.318 ms  1.307 ms
+ 4  192.168.12.2 (192.168.12.2)  1.851 ms  1.840 ms  1.830 ms
+#+end_src
+
+DPU routes, deployed with ~make kernel~ while the PoC is running so that the routes get
+offloaded to the DPU VM:
+
+#+begin_src sh :results output
+[donaldh@ekho-host-a ~]$ traceroute 192.168.12.2
+traceroute to 192.168.12.2 (192.168.12.2), 30 hops max, 60 byte packets
+ 1  192.168.11.1 (192.168.11.1)  0.478 ms  0.452 ms  0.442 ms
+ 2  192.168.12.2 (192.168.12.2)  0.940 ms  0.932 ms  0.924 ms
+#+end_src
