@@ -347,3 +347,36 @@ stats struct from the data present in the BPF maps.
 
 #+RESULTS:
 [[file:images/stats_offload.png]]
+
+** Driver-backed BPF Maps
+
+#+begin_src dot :file "images/driver_backed_bpf_maps.png" :exports results
+ digraph bpf_maps {
+        fontname="Arial"
+        node [fontname="Arial"]
+        edge [fontname="Arial"]
+
+        subgraph user_space {
+                app [shape=box]
+        }
+        subgraph cluster_kernel {
+                label = "kernel"
+                labeljust = "l"
+                bpf [shape=box; label="BPF subsys"]
+                driver [shape=box]
+                maps [shape=note]
+                {rank = same; driver; maps;}
+        }
+
+        app -> bpf [label="bpf_map_create"]
+        bpf -> driver [label="ops->ndo_bpf(...)"]
+        driver -> maps [dir=back]
+        driver -> nic
+
+        app -> maps [label="bpf_map_update_elem(...)"]
+        maps -> nic [style=dashed]
+ }
+#+end_src
+
+#+RESULTS:
+[[file:images/driver_backed_bpf_maps.png]]
