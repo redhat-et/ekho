@@ -9,7 +9,7 @@ BPFTOOL ?= bpftool
 SYS_BTF_VMLINUX := /sys/kernel/btf/vmlinux
 VMLINUX := $(OUTPUT)/vmlinux.h
 
-LIBBPF ?= libbpf
+LIBBPF ?= ../libbpf
 LIBBPF_INST ?= install
 LIBBPF_OBJ=$(LIBBPF_INST)/lib64/libbpf.a
 
