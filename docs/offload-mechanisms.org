@@ -110,6 +110,58 @@ state on the DPU hardware.
 #+RESULTS:
 [[file:images/mirror_state.png]]
 
+*** Mirroring state - DPU view
+
+#+begin_src dot :file "images/mirror_state_dpu.png" :exports results
+ digraph mirror_state_dpu {
+        newrank=true;
+        fontname="Arial"
+        node [fontname="Arial"]
+        edge [fontname="Arial"]
+
+        subgraph cluster_host {
+                label = "Host"
+                labeljust = "l"
+        subgraph user_space {
+                app [shape=box]
+                listener [shape=box]
+                rank = same;
+        }
+        subgraph cluster_kernel {
+                label = "kernel"
+                labeljust = "l"
+                tc [shape=box; label="tc / rtnl"]
+                driver [shape=box]
+        }
+        }
+        subgraph cluster_xPU {
+                label = "xPU"
+                labeljust = "l"
+                subgraph cluster_compute {
+                        label = "Compute"
+                        kernel [label="kernel"]
+                }
+                nic
+        }
+
+        { rank=same; driver; kernel; }
+
+        app -> tc [label="netlink"]
+        listener -> tc [label="netlink\nnotify"; dir=back]
+        tc -> driver [label="ops->ndo_setup_tc(...)"]
+        driver -> kernel
+        listener -> kernel [label="out of band\nprogramming" style=dashed]
+        kernel -> nic
+
+        edge[style=invis]
+        listener->tc->driver->nic
+ }
+#+end_src
+
+
+#+RESULTS:
+[[file:images/mirror_state_dpu.png]]
+
 ** Extending offloads with BPF
 
 It might be possible to use BPF ~struct_ops~ to provide a way to extend offload capabilities
