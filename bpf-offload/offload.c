@@ -12,12 +12,13 @@
 #include <bpf/bpf.h>
 #include <string.h>
 #include <errno.h>
+#include <sys/stat.h>
 
 #include "offload.skel.h"
 #include "offload.h"
 
 static struct env {
-	int interval;
+	int ifindex;
 	bool verbose;
 } env = { 1, 0 };
 
@@ -26,10 +27,10 @@ const char *argp_program_bug_address = "<donald.hunter@redhat.com>";
 const char argp_program_doc[] =
 	"BPF netdev hw offload prototype.\n"
 	"\n"
-	"USAGE: ./offload [-v]\n";
+	"USAGE: ./offload [-v] [-i <ifindex>]\n";
 
 static const struct argp_option opts[] = {
-	{ "interval", 'i', "seconds", 0, "Interval between reports" },
+	{ "interface", 'i', "ifindex", 0, "Interface to attach" },
 	{ "verbose", 'v', NULL, 0, "Verbose debug output" },
 	{},
 };
@@ -38,7 +39,7 @@ static error_t parse_arg(int key, char *arg, struct argp_state *state)
 {
 	switch (key) {
 	case 'i':
-		env.interval = atoi(arg);
+		env.ifindex = atoi(arg);
 		break;
 	case 'v':
 		env.verbose = true;
@@ -77,12 +78,21 @@ int main(int argc, char **argv)
 {
 	struct offload_bpf *skel;
 	struct bpf_link *link;
+	char dir[100];
+	char path[PATH_MAX];
 	int err;
 
 	/* Parse command line arguments */
 	err = argp_parse(&argp, argc, argv, 0, NULL, NULL);
 	if (err)
 		return err;
+
+	snprintf(dir, sizeof(dir), "/sys/fs/bpf/ekho-%d", env.ifindex);
+	err = mkdir(dir, 0700);
+	if (err) {
+		fprintf(stderr, "Failed to create pin dir %s\n", dir);
+		goto cleanup;
+	}
 
 	libbpf_set_strict_mode(LIBBPF_STRICT_ALL);
 	/* Set up libbpf errors and debug info callback */
@@ -111,8 +121,14 @@ int main(int argc, char **argv)
 		fprintf(stderr, "Failed to load and verify BPF skeleton\n");
 		goto cleanup;
 	}
+	snprintf(path, PATH_MAX, "%s/offload", dir);
+	err = bpf_object__pin(skel->obj, path);
+	if (err) {
+		fprintf(stderr, "Failed to pin offload obj\n");
+		goto cleanup;
+	}
 
-	err = bpf_map__set_ifindex(skel->maps.hwops, 1);
+	err = bpf_map__set_ifindex(skel->maps.hwops, env.ifindex);
 	if (err) {
 		fprintf(stderr, "Failed to set ifindex\n");
 		goto cleanup;
@@ -121,6 +137,12 @@ int main(int argc, char **argv)
 	link = bpf_map__attach_struct_ops(skel->maps.hwops);
 	if (!link) {
 		perror("Failed to attach struct_ops");
+		goto cleanup;
+	}
+	snprintf(path, sizeof(path), "%s/%s", dir, "link");
+	bpf_link__pin(link, path);
+	if (err) {
+		fprintf(stderr, "Failed to pin link\n");
 		goto cleanup;
 	}
 
