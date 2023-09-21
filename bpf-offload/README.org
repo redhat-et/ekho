@@ -1,7 +1,9 @@
 * BPF offload "firmware"
 
 This PoC demonstrates a framework that uses ~struct_ops~ for flowtable offload
-"firmware".
+"firmware". It needs to be run on kernel built from
+https://github.com/donaldh/linux/tree/ekho which contains the necessary
+struct_ops features for the veth interface.
 
 ** Usage
 
