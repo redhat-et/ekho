@@ -1,0 +1,87 @@
+* BPF offload "firmware"
+
+This PoC demonstrates a framework that uses ~struct_ops~ for flowtable offload
+"firmware".
+
+** Usage
+
+#+begin_example
+$ make -f Makefile.poc
+virtme              Run a virtme VM
+poc                 Run all PoC setup steps
+setup               Basic configuration for virtme kernel
+attach              Attach BPF offload programs to netdevs
+detach              Detach BPF offload programs
+table               Add a flowtable for one, two
+chain               Add a chain + rule to add flows to flowtable
+iperf               Run an iperf3 server in netns two
+trace               Monitor the trace_pipe
+client              Run an iperf3 client in netns one
+del-chain           Delete the chain + rule
+del-table           Delete the table
+help                This help
+#+end_example
+
+Run the PoC kernel in a virtme VM:
+
+#+begin_src sh :results output
+make -f Makefile.poc virtme KDIR=~/linux-ekho
+#+end_src
+
+Run the PoC setup:
+
+#+begin_src sh
+# make -f /home/donaldh/ekho/bpf-offload/Makefile.poc poc
+echo 1 > /proc/sys/net/ipv4/ip_forward
+mount -t bpf bpf /sys/fs/bpf/
+/home/donaldh/xdp-tutorial/testenv/testenv.sh setup --legacy-ip -n one
+Setting up new environment 'one'
+...
+PING fc00:dead:cafe:1::1(fc00:dead:cafe:1::1) 56 data bytes
+64 bytes from fc00:dead:cafe:1::1: icmp_seq=1 ttl=64 time=0.019 ms
+
+/home/donaldh/xdp-tutorial/testenv/testenv.sh setup --legacy-ip -n two
+Setting up new environment 'two'
+...
+PING fc00:dead:cafe:2::1(fc00:dead:cafe:2::1) 56 data bytes
+64 bytes from fc00:dead:cafe:2::1: icmp_seq=1 ttl=64 time=0.015 ms
+
+/home/donaldh/ekho/bpf-offload/offload -i 2
+...
+[   63.186700] bpf_hw_reg: one
+
+/home/donaldh/ekho/bpf-offload/offload -i 3
+...
+[   63.225930] bpf_hw_reg: two
+
+nft add table ip filter
+nft add flowtable ip filter f { hook ingress priority 0\; devices = { one, two }\; flags offload\; }
+[   63.496729] Calling flow_block_cb_setup_simple on two
+[   63.497268] Calling flow_block_cb_setup_simple on one
+nft add chain ip filter forward { type filter hook forward priority 0\; }
+nft add rule ip filter forward ip protocol tcp flow add @f
+#+end_src
+
+Run iperf and an iperf client:
+
+#+begin_src sh
+# make -f /home/donaldh/ekho/bpf-offload/Makefile.poc iperf client
+#+end_src
+
+Check the trace output:
+
+#+begin_src sh
+cat /sys/kernel/tracing/trace_pipe
+#+end_src
+
+#+begin_example
+...
+    kworker/u4:2-31      [001] ...11    56.498192: bpf_trace_printk: struct_ops/setup_ft type=3 command=0
+    kworker/u4:2-31      [001] ...11    56.498192: bpf_trace_printk: struct_ops/setup_ft type=3 command=0
+    kworker/u4:1-12      [001] ...11    56.703957: bpf_trace_printk: struct_ops/setup_ft type=3 command=0
+    kworker/u4:1-12      [001] ...11    56.703962: bpf_trace_printk: struct_ops/setup_ft type=3 command=0
+    kworker/u4:1-12      [001] ...11    57.522681: bpf_trace_printk: struct_ops/setup_ft type=3 command=1
+    kworker/u4:1-12      [001] ...11    57.522695: bpf_trace_printk: struct_ops/setup_ft type=3 command=1
+    kworker/u4:2-31      [000] ...11    57.522703: bpf_trace_printk: struct_ops/setup_ft type=3 command=1
+    kworker/u4:2-31      [000] ...11    57.522707: bpf_trace_printk: struct_ops/setup_ft type=3 command=1
+#+end_example
