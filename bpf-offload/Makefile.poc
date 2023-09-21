@@ -1,0 +1,52 @@
+# -*- makefile -*-
+
+VIRTME ?= ~/virtme
+KDIR ?= .
+
+virtme:	## Run a virtme VM
+	$(VIRTME)/virtme-run --kdir $(KDIR) --mods=auto --cpus 2 --memory 8G
+
+poc:	## Run all PoC setup steps
+poc:	setup attach table chain
+
+setup:	## Basic configuration for virtme kernel
+	echo 1 > /proc/sys/net/ipv4/ip_forward
+	mount -t bpf bpf /sys/fs/bpf/
+	/home/donaldh/xdp-tutorial/testenv/testenv.sh setup --legacy-ip -n one
+	/home/donaldh/xdp-tutorial/testenv/testenv.sh setup --legacy-ip -n two
+
+attach:	## Attach BPF offload programs to netdevs
+	/home/donaldh/ekho/bpf-offload/offload -i 2
+	/home/donaldh/ekho/bpf-offload/offload -i 3
+
+detach:	## Detach BPF offload programs
+	rm -rf /sys/fs/bpf/ekho-*
+
+table:	## Add a flowtable for one, two
+	nft add table ip filter
+	nft add flowtable ip filter f { hook ingress priority 0\; devices = { one, two }\; flags offload\; }
+
+chain:	## Add a chain + rule to add flows to flowtable
+	nft add chain ip filter forward { type filter hook forward priority 0\; }
+	nft add rule ip filter forward ip protocol tcp flow add @f
+
+iperf:	## Run an iperf3 server in netns two
+	screen -S iperf -dm ip netns exec two iperf3 -s
+
+trace:	## Monitor the trace_pipe
+	screen -S trace cat /sys/kernel/tracing/trace_pipe
+
+client:	## Run an iperf3 client in netns one
+	ip netns exec one iperf3 -c 10.11.2.2
+
+del-chain:	## Delete the chain + rule
+	nft delete chain ip filter forward
+
+del-table:	## Delete the table
+	nft delete table ip filter
+
+help:	## This help
+	@awk 'BEGIN {FS = ":.*?## "} /^[a-zA-Z_-]+:.*?## / {printf "\033[36m%-20s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST)
+
+.PHONY: help
+.DEFAULT_GOAL := help
