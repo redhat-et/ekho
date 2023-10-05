@@ -26,7 +26,7 @@ detach:	## Detach BPF offload programs
 
 table:	## Add a flowtable for one, two
 	nft add table ip filter
-	nft add flowtable ip filter f { hook ingress priority 0\; devices = { one, two }\; flags offload\; }
+	nft add flowtable ip filter f { hook ingress priority 0\; devices = { one, two }\; flags offload\; counter\; }
 
 chain:	## Add a chain + rule to add flows to flowtable
 	nft add chain ip filter forward { type filter hook forward priority 0\; }
