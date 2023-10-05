@@ -7,6 +7,8 @@
 #include <bpf/bpf_tracing.h>
 #include <bpf/bpf_core_read.h>
 #include <linux/netdevice.h>
+#include <stdbool.h>
+#include <errno.h>
 
 #include "offload.h"
 
@@ -16,11 +18,19 @@ struct net_device {
 	char name[IFNAMSIZ];
 } __attribute__((preserve_access_index));
 
+enum flow_action_hw_stats {
+	FLOW_ACTION_HW_STATS_IMMEDIATE = 1,
+	FLOW_ACTION_HW_STATS_DELAYED = 2,
+	FLOW_ACTION_HW_STATS_DISABLED = 4
+};
+
 struct flow_stats {
 	__u64	pkts;
 	__u64	bytes;
 	__u64	drops;
 	__u64	lastused;
+	enum flow_action_hw_stats used_hw_stats;
+	bool used_hw_stats_valid;
 } __attribute__((preserve_access_index));
 
 enum flow_cls_command {
@@ -33,7 +43,7 @@ enum flow_cls_command {
 
 struct flow_cls_offload {
 	enum flow_cls_command command;
-	unsigned long cookie;
+	bool use_act_stats;
 	struct flow_stats stats;
 } __attribute__((preserve_access_index));
 
@@ -73,56 +83,44 @@ struct net_device_hw_ops {
 	char name[16];
 };
 
-SEC("struct_ops/offload")
-void BPF_PROG(offload,
-	      struct net_device *dev,
-	      struct flow_cls_offload *off)
+int flow_setup(struct flow_cls_offload *f,
+	       void *cb_priv)
 {
-	bpf_printk("struct_ops/offload %s\n", dev->name);
-	off->stats.pkts = 1;
-	off->stats.bytes = 1;
-	off->stats.lastused = bpf_ktime_get_ns();
-}
+	bpf_printk("flow_setup command=%d", f->command);
 
-SEC("struct_ops/setup_tc")
-int BPF_PROG(setup_tc,
-	     struct net_device *dev,
-	     enum tc_setup_type type,
-	     void *type_data)
-{
-	bpf_printk("struct_ops/setup_tc dev=%s, type=%d\n", dev->name, type);
-
-	struct flow_block_offload *f = type_data;
-	switch (type) {
-	case TC_SETUP_FT:
+	switch (f->command) {
+	case FLOW_CLS_REPLACE:
+	case FLOW_CLS_DESTROY:
+		return 0;
+	case FLOW_CLS_STATS:
+		f->stats.pkts += 1;
+		f->stats.bytes += 10;
+		f->stats.lastused = bpf_jiffies64();
+		f->stats.used_hw_stats = FLOW_ACTION_HW_STATS_DELAYED;
+		f->stats.used_hw_stats_valid = true;
 		return 0;
 	default:
-		return -95; /* -EOPNOTSUPP */
+		return -EOPNOTSUPP;
 	}
 }
 
 SEC("struct_ops/setup_ft")
 int BPF_PROG(setup_ft,
 	     enum tc_setup_type type,
-	     struct flow_cls_offload *type_data,
+	     void *type_data,
 	     void *cb_priv)
 {
-	struct flow_cls_offload *f = type_data;
-	int command = BPF_CORE_READ(f, command);
-	bpf_printk("struct_ops/setup_ft type=%d command=%d\n", type, command);
-
 	switch (type) {
 	case TC_SETUP_FT:
-		return 0;
+	case TC_SETUP_CLSFLOWER:
+		return flow_setup(type_data, cb_priv);
 	default:
-		return -95; /* -EOPNOTSUPP */
+		return -EOPNOTSUPP;
 	}
 }
 
 SEC(".struct_ops.link")
 struct net_device_hw_ops hwops = {
-	.offload = (void *)offload,
-	.setup_tc = (void *)setup_tc,
 	.setup_ft = (void *)setup_ft,
 	.name = "netdev_hwops",
 };
