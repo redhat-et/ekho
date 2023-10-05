@@ -2,6 +2,7 @@
 
 VIRTME ?= ~/virtme
 KDIR ?= .
+T ?= 30
 
 virtme:	## Run a virtme VM
 	$(VIRTME)/virtme-run --kdir $(KDIR) --mods=auto --cpus 2 --memory 8G
@@ -40,6 +41,9 @@ trace:	## Monitor the trace_pipe
 
 client:	## Run an iperf3 client in netns one
 	ip netns exec one iperf3 -c 10.11.2.2
+
+sclient:	## Run an iperf3 client in a screen session
+	screen -S client -dm ip netns exec one iperf3 -c 10.11.2.2 -t $(T)
 
 del-chain:	## Delete the chain + rule
 	nft delete chain ip filter forward
