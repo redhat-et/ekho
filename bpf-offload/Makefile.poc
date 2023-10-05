@@ -10,7 +10,9 @@ poc:	## Run all PoC setup steps
 poc:	setup attach table chain
 
 setup:	## Basic configuration for virtme kernel
-	echo 1 > /proc/sys/net/ipv4/ip_forward
+	sysctl -w net.ipv4.ip_forward=1
+	modprobe nf_conntrack
+	sysctl -w net.netfilter.nf_conntrack_acct=1
 	mount -t bpf bpf /sys/fs/bpf/
 	/home/donaldh/xdp-tutorial/testenv/testenv.sh setup --legacy-ip -n one
 	/home/donaldh/xdp-tutorial/testenv/testenv.sh setup --legacy-ip -n two
