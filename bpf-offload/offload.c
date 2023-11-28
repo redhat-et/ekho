@@ -78,8 +78,8 @@ int main(int argc, char **argv)
 {
 	struct offload_bpf *skel;
 	struct bpf_link *link;
-	char dir[100];
 	char path[PATH_MAX];
+	char dir[100];
 	int err;
 
 	/* Parse command line arguments */
@@ -139,12 +139,19 @@ int main(int argc, char **argv)
 		perror("Failed to attach struct_ops");
 		goto cleanup;
 	}
-	snprintf(path, sizeof(path), "%s/%s", dir, "link");
-	bpf_link__pin(link, path);
+	snprintf(path, sizeof(path), "%s/link", dir);
+	err = bpf_link__pin(link, path);
 	if (err) {
 		fprintf(stderr, "Failed to pin link\n");
 		goto cleanup;
 	}
+
+	/* snprintf(path, sizeof(path), "%s/ringbuf", dir); */
+	/* err = bpf_map__pin(skel->maps.offload_events, path); */
+	/* if (err) { */
+	/* 	fprintf(stderr, "Failed to pin ringbuf\n"); */
+	/* 	goto cleanup; */
+	/* } */
 
 cleanup:
 	/* Clean up */

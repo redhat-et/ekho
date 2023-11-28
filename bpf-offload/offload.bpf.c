@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0 OR BSD-3-Clause
 /* Copyright (c) 2023 Red Hat */
 
+#include <asm-generic/errno-base.h>
 #include <linux/bpf.h>
 #include <bpf/bpf_helpers.h>
 #include <bpf/bpf_endian.h>
@@ -33,19 +34,16 @@ struct flow_stats {
 	bool used_hw_stats_valid;
 } __attribute__((preserve_access_index));
 
-enum flow_cls_command {
-	FLOW_CLS_REPLACE,
-	FLOW_CLS_DESTROY,
-	FLOW_CLS_STATS,
-	FLOW_CLS_TMPLT_CREATE,
-	FLOW_CLS_TMPLT_DESTROY,
-};
-
 struct flow_cls_offload {
 	enum flow_cls_command command;
 	bool use_act_stats;
 	struct flow_stats stats;
 } __attribute__((preserve_access_index));
+
+struct {
+	__uint(type, BPF_MAP_TYPE_RINGBUF);
+	__uint(max_entries, 4096);
+} offload_events SEC(".maps");
 
 enum tc_setup_type {
 	TC_QUERY_CAPS,
@@ -77,29 +75,49 @@ struct net_device_hw_ops {
 	int (*setup_tc)(struct net_device *dev,
 			enum tc_setup_type type,
 			void *type_data);
+	int (*setup_block)(enum tc_setup_type type,
+			void *type_data,
+			void *cb_priv);
 	int (*setup_ft)(enum tc_setup_type type,
 			void *type_data,
 			void *cb_priv);
 	char name[16];
 };
 
+void flow_cls_set_stats(struct flow_cls_offload *f,
+			__u64 pkts,
+			__u64 bytes,
+			__u64 drops,
+			__u64 lastused) __ksym;
+void flow_cls_inc_stats(struct flow_cls_offload *f,
+			__u64 pkts,
+			__u64 bytes,
+			__u64 drops,
+			__u64 lastused) __ksym;
+
 int flow_setup(struct flow_cls_offload *f,
 	       void *cb_priv)
 {
 	bpf_printk("flow_setup command=%d", f->command);
 
+	struct offload_event *event =
+		bpf_ringbuf_reserve(&offload_events, sizeof(struct offload_event), 0);
+	if (!event)
+		return -ENOMEM;
+
+	event->command = f->command;
+
 	switch (f->command) {
 	case FLOW_CLS_REPLACE:
 	case FLOW_CLS_DESTROY:
+		bpf_ringbuf_submit(event, 0);
 		return 0;
 	case FLOW_CLS_STATS:
-		f->stats.pkts += 1;
-		f->stats.bytes += 10;
-		f->stats.lastused = bpf_jiffies64();
-		f->stats.used_hw_stats = FLOW_ACTION_HW_STATS_DELAYED;
-		f->stats.used_hw_stats_valid = true;
+		bpf_ringbuf_submit(event, 0);
+		flow_cls_inc_stats(f, 2, 20, 0, bpf_jiffies64());
 		return 0;
 	default:
+		bpf_ringbuf_discard(event, 0);
 		return -EOPNOTSUPP;
 	}
 }
@@ -119,8 +137,19 @@ int BPF_PROG(setup_ft,
 	}
 }
 
+SEC("struct_ops/setup_block")
+int BPF_PROG(setup_block,
+	     enum tc_setup_type type,
+	     void *type_data,
+	     void *cb_priv)
+{
+	bpf_printk("setup_block type=%d", type);
+	return -EOPNOTSUPP;
+}
+
 SEC(".struct_ops.link")
 struct net_device_hw_ops hwops = {
 	.setup_ft = (void *)setup_ft,
+	.setup_block = (void *)setup_block,
 	.name = "netdev_hwops",
 };
