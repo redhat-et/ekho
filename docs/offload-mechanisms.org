@@ -330,3 +330,44 @@ stats struct from the data present in the BPF maps.
 
 #+RESULTS:
 [[file:images/infra_reuse.png]]
+
+
+** BPF Switchdev Notifier
+
+
+#+begin_src dot :file "images/switchdev_notifier.png" :exports results
+ digraph switchdev_notifier {
+        fontname="Arial"
+        nodesep=0.75
+        node [fontname="Arial"]
+        edge [fontname="Arial"]
+
+        subgraph user_space {
+                app [shape=box]
+                listener [shape=box label="User space helper\nw/ vendor libraries"]
+                rank = same;
+        }
+        subgraph cluster_kernel {
+                label = "kernel"
+                labeljust = "l"
+                bridge [shape=box; label="bridge"]
+                bpf [shape=box label="BPF prog\nfentry/call_switchdev_notifiers"]
+                ringbuf
+                {rank = same; bridge; bpf; ringbuf}
+                driver [shape=box label="driver(s)"]
+        }
+
+        app -> bridge [label="netlink"]
+        listener -> ringbuf  [dir=back]
+        bridge -> bpf
+        bpf -> ringbuf
+        bridge -> driver [dir=back label="MAC/VLAN learning\ncall_switchdev_notifiers\n(*_TO_BRIDGE)"]
+        bridge -> driver [label="call_switchdev_notifiers\n(*_TO_DEVICE)"]
+        driver -> nic [label="traditional\nprogramming path"]
+
+        listener -> nic [label="out of band\nprogramming" style=dashed]
+ }
+#+end_src
+
+#+RESULTS:
+[[file:images/switchdev_notifier.png]]
