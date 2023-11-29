@@ -295,3 +295,38 @@ stats struct from the data present in the BPF maps.
 
 #+RESULTS:
 [[file:images/stats_offload.png]]
+
+
+** BPF Infrastructure Reuse
+
+#+begin_src dot :file "images/infra_reuse.png" :exports results
+ digraph bpf_infra {
+        fontname="Arial"
+        nodesep=0.75
+        node [fontname="Arial"]
+        edge [fontname="Arial"]
+
+        subgraph user_space {
+                app [shape=box]
+                listener [shape=box label="User space helper\nw/ vendor libraries"]
+                rank = same;
+        }
+        subgraph cluster_kernel {
+                label = "kernel"
+                labeljust = "l"
+                bridge [shape=box; label="bridge"]
+                ringbuf
+                {rank = same; bridge; ringbuf}
+                module [shape=box label="module(s)\nregister w/ switchdev notifier"]
+        }
+
+        app -> bridge [label="netlink"]
+        listener -> ringbuf [dir=back]
+        bridge -> module [label="call_switchdev_notifiers\n(*_TO_DEVICE)"]
+        module -> ringbuf [label="ringbuf now usable\noutside BPF subsystem"]
+        listener -> nic [label="out of band\nprogramming" style=dashed]
+ }
+#+end_src
+
+#+RESULTS:
+[[file:images/infra_reuse.png]]
